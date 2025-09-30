@@ -24,9 +24,9 @@
       updateDoc,
       deleteDoc,
       onSnapshot,
-      query, // Añadido para futuras consultas más avanzadas
-      where, // Añadido para futuras consultas más avanzadas
-      orderBy // Añadido para futuras consultas más avanzadas
+      query,
+      where,
+      orderBy
     } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
 
     // Tu configuración de Firebase (¡REEMPLAZA ESTO CON TUS PROPIOS VALORES!)
@@ -60,7 +60,7 @@
     window.onSnapshot = onSnapshot;
     window.query = query;
     window.where = where;
-    window.orderBy = orderBy; // Exportamos también estas funciones útiles para consultas
+    window.orderBy = orderBy;
   </script>
   <!-- ¡FIN DE LA INTEGRACIÓN DE FIREBASE! -->
 
@@ -762,15 +762,16 @@
   <!-- Script de Bootstrap 5 (¡IMPORTANTE!) -->
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script>
-// --- IndexedDB Constants (MANTENER POR AHORA, PERO SE ELIMINARÁN) ---
-// Estos son los nombres de tus Object Stores de IndexedDB.
-// Los mantendremos por ahora, pero la lógica que los usa será reemplazada.
+// --- IndexedDB Constants (ELIMINAR ESTAS LÍNEAS) ---
+// Estas constantes y la variable 'db' ya no son necesarias si te has movido completamente a Firestore.
+// Las dejo comentadas para que sepas qué eliminar.
+/*
 const DB_NAME = 'RegistroDB';
 const DB_VERSION = 13;
-let db; // Esta variable 'db' se referirá a IndexedDB, no a Firestore.
-        // Es importante no confundirlas.
+let db;
+*/
 
-// --- Firestore Collection Names (NUEVO) ---
+// --- Firestore Collection Names ---
 // Define los nombres de tus colecciones en Firestore
 const STORE_ALUMNOS_FIRESTORE = "alumnos";
 const STORE_CUPOS_FIRESTORE = "cupos";
@@ -782,10 +783,8 @@ const STORE_PROYECTOS_FIRESTORE = "proyectos";
 // Variable global para almacenar los alumnos filtrados para la exportación
 let lastFilteredAlumnos = [];
 
-// --- IndexedDB Generic Helper Functions (ELIMINAR O ADAPTAR) ---
-// Estas funciones DEBERÍAN SER REEMPLAZADAS por las nuevas funciones de Firestore.
-// Por ahora, las comentaré para evitar conflictos, pero tu código actual las sigue llamando.
-// Necesitarás adaptar cada llamada en tu script principal.
+// --- IndexedDB Generic Helper Functions (ELIMINAR ESTAS FUNCIONES) ---
+// Elimina todas estas funciones relacionadas con IndexedDB.
 /*
 const openDB = () => new Promise((resolve,reject)=>{ ... });
 const addData = (storeName, data) => new Promise((res, rej) => { ... });
@@ -796,7 +795,7 @@ const deleteData = (storeName, id) => new Promise((res, rej) => { ... });
 const clearStore = (storeName, transaction = null) => new Promise((resolve, reject) => { ... });
 */
 
-// --- Firestore Helper Functions (NUEVO - REEMPLAZARÁN LAS DE IndexedDB) ---
+// --- Firestore Helper Functions (NUEVO - REEMPLAZAN LAS DE IndexedDB) ---
 // Estas funciones usarán las variables globales (window.db, window.collection, etc.)
 // que definimos en el script type="module" de arriba.
 
@@ -1124,7 +1123,10 @@ const deleteProyectoFirestore = async (id) => {
 // Función para buscar en la plantilla por nombre o correo (Firestore)
 const searchPlantillaAlumnosFirestore = async (queryText) => {
   try {
-    const plantillaAlumnos = await getPlantillaAlumnosFirestore(); // Obtener todos y filtrar en cliente
+    // Para búsquedas de autocompletado, es común obtener todos los datos
+    // y filtrar en el cliente si la colección no es demasiado grande.
+    // Para colecciones muy grandes, se usarían consultas de Firestore con 'where'.
+    const plantillaAlumnos = await getPlantillaAlumnosFirestore();
     const lowerCaseQuery = queryText.toLowerCase();
     const filtered = plantillaAlumnos.filter(alumno =>
       (alumno.nombre && alumno.nombre.toLowerCase().includes(lowerCaseQuery)) ||
@@ -1235,9 +1237,10 @@ const setupRealtimeProfesoresListener = () => {
       });
     }
     // Después de renderizar profesores, actualiza cupos y alumnos si es necesario
+    // Estos listeners se llaman aquí para asegurar que los selects de profesor estén poblados
+    // antes de que los cupos y alumnos intenten referenciarlos.
     setupRealtimeCuposListener();
-    setupRealtimeAlumnosListener();
-    applyReportFilters(); // Para actualizar los filtros de reporte
+    setupRealtimeAlumnosListener(); // Este listener también se encarga de actualizar el reporte
   }, (error) => {
     console.error("Error al escuchar cambios en profesores:", error);
     showToast("Error al cargar profesores en tiempo real.", 'danger');
@@ -1276,6 +1279,7 @@ const setupRealtimeCuposListener = () => {
       });
     }
     // Después de renderizar cupos, actualiza alumnos si es necesario
+    // Esto asegura que la lista de alumnos refleje los cambios en los cupos.
     setupRealtimeAlumnosListener();
   }, (error) => {
     console.error("Error al escuchar cambios en cupos:", error);
@@ -1295,8 +1299,8 @@ const setupRealtimeAlumnosListener = () => {
 
     if (snapshot.empty) {
       lista.innerHTML = '<tr><td colspan="9" class="text-center">No hay alumnos inscritos.</td></tr>';
-      document.getElementById('btnExportExcel').disabled = true; // Deshabilita exportar si no hay datos
-      lastFilteredAlumnos = []; // Limpia los datos de exportación
+      document.getElementById('btnExportExcel').disabled = true;
+      lastFilteredAlumnos = [];
       return;
     }
 
@@ -1308,7 +1312,7 @@ const setupRealtimeAlumnosListener = () => {
       if (cupo) {
         const profesor = profesores.find(p => p.id === cupo.profesorId);
         const nombreProfesor = profesor ? profesor.nombre : 'N/A';
-        const fechasTexto = Array.isArray(cupo.fechas) ? cupo.fechas.join(', ') : c.fechas;
+        const fechasTexto = Array.isArray(cupo.fechas) ? cupo.fechas.join(', ') : cupo.fechas;
         horarioTexto = `${nombreProfesor} - ${fechasTexto} ${cupo.horaInicio}-${cupo.horaFin}`;
       }
 
@@ -1399,6 +1403,7 @@ const setupRealtimeProyectosListener = () => {
       });
     }
     // Después de renderizar proyectos, actualiza alumnos si es necesario
+    // Esto asegura que la lista de alumnos refleje los cambios en los proyectos.
     setupRealtimeAlumnosListener();
     applyReportFilters(); // Para actualizar los filtros de reporte
   }, (error) => {
@@ -1419,7 +1424,7 @@ async function eliminarAlumno(id, cupoId){
         await updateCupoFirestore(cupo.id, cupo); // Usa la función de Firestore
       }
     }
-    // Los listeners de onSnapshot se encargarán de renderizar
+    // Los listeners de onSnapshot se encargarán de renderizar la UI
     showToast("Alumno eliminado de la inscripción actual exitosamente.", 'success');
   }
 }
@@ -1467,8 +1472,7 @@ async function abrirModalCambiarHorario(alumnoId) {
   document.getElementById('alumnoIdCambiarHorario').value = alumno.id;
   document.getElementById('nombreAlumnoCambiarHorario').textContent = alumno.nombre;
 
-  // renderCupos() ya no se llama directamente, el listener lo hace
-  // Asegúrate de que el selectAlumnoCupoModal se actualice con el listener de cupos
+  // El select de cupos se actualiza automáticamente con setupRealtimeCuposListener
   document.getElementById('cupoSelectModal').value = alumno.cupoId || '';
 
   modalCambiarHorarioInstance = new bootstrap.Modal(document.getElementById('modalCambiarHorario'));
@@ -1476,7 +1480,7 @@ async function abrirModalCambiarHorario(alumnoId) {
 }
 
 async function guardarCambioHorario() {
-  const alumnoId = document.getElementById('alumnoIdCambiarHorario').value; // ID ya es string
+  const alumnoId = document.getElementById('alumnoIdCambiarHorario').value;
   const nuevoCupoId = document.getElementById('cupoSelectModal').value;
 
   if (!nuevoCupoId) {
@@ -1484,7 +1488,7 @@ async function guardarCambioHorario() {
     return;
   }
 
-  const alumno = await getAlumnoByIdFirestore(alumnoId); // Usa la función de Firestore
+  const alumno = await getAlumnoByIdFirestore(alumnoId);
   if (!alumno) {
     showToast("Error: Alumno no encontrado.", 'danger');
     return;
@@ -1498,15 +1502,15 @@ async function guardarCambioHorario() {
 
   // Decrementar cupo anterior
   if (alumno.cupoId) {
-    const cupoAnterior = await getCupoByIdFirestore(alumno.cupoId); // Usa la función de Firestore
+    const cupoAnterior = await getCupoByIdFirestore(alumno.cupoId);
     if (cupoAnterior) {
       cupoAnterior.disponibles++;
-      await updateCupoFirestore(cupoAnterior.id, cupoAnterior); // Usa la función de Firestore
+      await updateCupoFirestore(cupoAnterior.id, cupoAnterior);
     }
   }
 
   // Incrementar nuevo cupo
-  const nuevoCupo = await getCupoByIdFirestore(nuevoCupoId); // Usa la función de Firestore
+  const nuevoCupo = await getCupoByIdFirestore(nuevoCupoId);
   if (!nuevoCupo || nuevoCupo.disponibles <= 0) {
     showToast("El nuevo horario seleccionado está lleno o no existe.", 'danger');
     // Revertir el decremento si el nuevo cupo falla
@@ -1520,22 +1524,22 @@ async function guardarCambioHorario() {
     return;
   }
   nuevoCupo.disponibles--;
-  await updateCupoFirestore(nuevoCupo.id, nuevoCupo); // Usa la función de Firestore
+  await updateCupoFirestore(nuevoCupo.id, nuevoCupo);
 
   // Actualizar alumno
   alumno.cupoId = nuevoCupoId;
-  await updateAlumnoFirestore(alumno.id, alumno); // Usa la función de Firestore
+  await updateAlumnoFirestore(alumno.id, alumno);
 
   showToast(`Horario de ${alumno.nombre} actualizado exitosamente.`, 'success');
   modalCambiarHorarioInstance.hide();
 
-  // Los listeners de onSnapshot se encargarán de renderizar
+  // Los listeners de onSnapshot se encargarán de renderizar la UI
 }
 
 let modalAsignarProyectoInstance;
 
 async function abrirModalAsignarProyecto(alumnoId) {
-  const alumno = await getAlumnoByIdFirestore(alumnoId); // Usa la función de Firestore
+  const alumno = await getAlumnoByIdFirestore(alumnoId);
   if (!alumno) {
     showToast("Alumno no encontrado.", 'danger');
     return;
@@ -1544,7 +1548,7 @@ async function abrirModalAsignarProyecto(alumnoId) {
   document.getElementById('alumnoIdAsignarProyecto').value = alumno.id;
   document.getElementById('nombreAlumnoAsignarProyecto').textContent = alumno.nombre;
 
-  // Los proyectos se cargan con el listener de proyectos
+  // El select de proyectos se actualiza automáticamente con setupRealtimeProyectosListener
   const proyectoSelectModal = document.getElementById('proyectoSelectModal');
   proyectoSelectModal.value = alumno.proyectoId || '';
   document.getElementById('pagoSelectModal').value = alumno.pago || '';
@@ -1562,43 +1566,43 @@ async function guardarProyectoAlumno() {
   const nuevoKit = document.getElementById('kitSelectModal').value;
   const nuevasObservaciones = document.getElementById('observacionesModal').value.trim();
 
-  const alumno = await getAlumnoByIdFirestore(alumnoId); // Usa la función de Firestore
+  const alumno = await getAlumnoByIdFirestore(alumnoId);
   if (!alumno) {
     showToast("Error: Alumno no encontrado.", 'danger');
     return;
   }
 
-  alumno.proyectoId = nuevoProyectoId || null; // Si es vacío, guarda null
+  alumno.proyectoId = nuevoProyectoId || null;
   alumno.pago = nuevoPago;
   alumno.kit = nuevoKit;
   alumno.observaciones = nuevasObservaciones;
-  await updateAlumnoFirestore(alumno.id, alumno); // Usa la función de Firestore
+  await updateAlumnoFirestore(alumno.id, alumno);
 
-  const nombreProyecto = nuevoProyectoId ? (await getProyectoByIdFirestore(nuevoProyectoId)).nombre : 'Sin Proyecto'; // Usa la función de Firestore
+  const nombreProyecto = nuevoProyectoId ? (await getProyectoByIdFirestore(nuevoProyectoId)).nombre : 'Sin Proyecto';
   showToast(`Proyecto y detalles de ${alumno.nombre} actualizados a "${nombreProyecto}" exitosamente.`, 'success');
   modalAsignarProyectoInstance.hide();
 
-  // Los listeners de onSnapshot se encargarán de renderizar
+  // Los listeners de onSnapshot se encargarán de renderizar la UI
 }
 
 
 // --- ACCIONES CUPOS (ADAPTADO PARA FIRESTORE) ---
 async function eliminarCupo(id){
-  const alumnos=await getAlumnosFirestore(); // Usa la función de Firestore
+  const alumnos=await getAlumnosFirestore();
   if(alumnos.some(a=>a.cupoId===id)){
     showToast("No se puede eliminar un cupo con alumnos asignados. Por favor, reasigne o elimine los alumnos de este cupo primero.", 'danger');
     return;
   }
   if(confirm("¿Estás seguro de eliminar este cupo? Esta acción no se puede deshacer.")){
-    await deleteCupoFirestore(id); // Usa la función de Firestore
-    // Los listeners de onSnapshot se encargarán de renderizar
+    await deleteCupoFirestore(id);
+    // Los listeners de onSnapshot se encargarán de renderizar la UI
     showToast("Cupo eliminado exitosamente.", 'success');
   }
 }
 
 // --- ACCIONES PROFESORES (ADAPTADO PARA FIRESTORE) ---
 async function editarProfesor(id) {
-  const profesor = await getProfesorByIdFirestore(id); // Usa la función de Firestore
+  const profesor = await getProfesorByIdFirestore(id);
   if (!profesor) {
     showToast("Profesor no encontrado.", 'danger');
     return;
@@ -1616,14 +1620,14 @@ async function editarProfesor(id) {
 }
 
 async function eliminarProfesor(id) {
-  const cupos = await getCuposFirestore(); // Usa la función de Firestore
+  const cupos = await getCuposFirestore();
   if (cupos.some(c => c.profesorId === id)) {
     showToast("No se puede eliminar un profesor que tiene cupos asignados. Elimine los cupos de este profesor primero.", 'danger');
     return;
   }
   if (confirm("¿Estás seguro de eliminar este profesor? Esta acción no se puede deshacer.")) {
-    await deleteProfesorFirestore(id); // Usa la función de Firestore
-    // Los listeners de onSnapshot se encargarán de renderizar
+    await deleteProfesorFirestore(id);
+    // Los listeners de onSnapshot se encargarán de renderizar la UI
     showToast("Profesor eliminado exitosamente.", 'success');
   }
 }
@@ -1636,7 +1640,7 @@ function resetProfesorForm() {
 
 // --- ACCIONES PLANTILLA ALUMNOS (ADAPTADO PARA FIRESTORE) ---
 async function editarPlantillaAlumnoEstado(id) {
-  const alumnoPlantilla = await getPlantillaAlumnoByIdFirestore(id); // Usa la función de Firestore
+  const alumnoPlantilla = await getPlantillaAlumnoByIdFirestore(id);
   if (!alumnoPlantilla) {
     showToast("Alumno de plantilla no encontrado.", 'danger');
     return;
@@ -1645,23 +1649,23 @@ async function editarPlantillaAlumnoEstado(id) {
   const nuevoEstado = alumnoPlantilla.estado === 'Activo' ? 'Inactivo' : 'Activo';
   if (confirm(`¿Cambiar el estado de ${alumnoPlantilla.nombre} a "${nuevoEstado}"?`)) {
     alumnoPlantilla.estado = nuevoEstado;
-    await updatePlantillaAlumnoFirestore(alumnoPlantilla.id, alumnoPlantilla); // Usa la función de Firestore
-    // Los listeners de onSnapshot se encargarán de renderizar
+    await updatePlantillaAlumnoFirestore(alumnoPlantilla.id, alumnoPlantilla);
+    // Los listeners de onSnapshot se encargarán de renderizar la UI
     showToast(`Estado de ${alumnoPlantilla.nombre} actualizado a "${nuevoEstado}".`, 'success');
   }
 }
 
 async function eliminarPlantillaAlumno(id) {
   if (confirm("¿Estás seguro de eliminar este alumno de la plantilla? Esto no afectará a los alumnos actualmente inscritos, pero no podrá ser buscado para futuras reinscripciones.")) {
-    await deletePlantillaAlumnoFirestore(id); // Usa la función de Firestore
-    // Los listeners de onSnapshot se encargarán de renderizar
+    await deletePlantillaAlumnoFirestore(id);
+    // Los listeners de onSnapshot se encargarán de renderizar la UI
     showToast("Alumno eliminado de la plantilla exitosamente.", 'success');
   }
 }
 
 // --- ACCIONES PROYECTOS (ADAPTADO PARA FIRESTORE) ---
 async function editarProyecto(id) {
-  const proyecto = await getProyectoByIdFirestore(id); // Usa la función de Firestore
+  const proyecto = await getProyectoByIdFirestore(id);
   if (!proyecto) {
     showToast("Proyecto no encontrado.", 'danger');
     return;
@@ -1677,15 +1681,15 @@ async function editarProyecto(id) {
 }
 
 async function eliminarProyecto(id) {
-  const alumnos = await getAlumnosFirestore(); // Usa la función de Firestore
+  const alumnos = await getAlumnosFirestore();
   if (alumnos.some(a => a.proyectoId === id)) {
     showToast("No se puede eliminar un proyecto que tiene alumnos asignados. Por favor, desasigne los alumnos de este proyecto primero.", 'danger');
     return;
   }
 
   if (confirm("¿Estás seguro de eliminar este proyecto? Esta acción no se puede deshacer.")) {
-    await deleteProyectoFirestore(id); // Usa la función de Firestore
-    // Los listeners de onSnapshot se encargarán de renderizar
+    await deleteProyectoFirestore(id);
+    // Los listeners de onSnapshot se encargarán de renderizar la UI
     showToast("Proyecto eliminado exitosamente.", 'success');
   }
 }
@@ -1714,7 +1718,7 @@ function autocomplete(inp) {
       this.parentNode.appendChild(a);
     }
 
-    const filteredArr = await searchPlantillaAlumnosFirestore(val); // Usa la función de Firestore
+    const filteredArr = await searchPlantillaAlumnosFirestore(val);
 
     for (i = 0; i < filteredArr.length; i++) {
       b = document.createElement("DIV");
@@ -1729,15 +1733,15 @@ function autocomplete(inp) {
       b.innerHTML = displayHtml;
       b.innerHTML += "<input type='hidden' value='" + filteredArr[i].id + "'>";
       b.addEventListener("click", async function(e) {
-          const plantillaId = this.getElementsByTagName("input")[0].value; // ID ya es string
-          const alumnoPlantilla = await getPlantillaAlumnoByIdFirestore(plantillaId); // Usa la función de Firestore
+          const plantillaId = this.getElementsByTagName("input")[0].value;
+          const alumnoPlantilla = await getPlantillaAlumnoByIdFirestore(plantillaId);
           if (alumnoPlantilla) {
               if (alumnoPlantilla.estado === 'Inactivo') {
                   if (confirm(`El alumno ${alumnoPlantilla.nombre} está INACTIVO. ¿Desea activarlo para reinscribirlo?`)) {
                       alumnoPlantilla.estado = 'Activo';
-                      await updatePlantillaAlumnoFirestore(plantillaId, alumnoPlantilla); // Usa la función de Firestore
+                      await updatePlantillaAlumnoFirestore(plantillaId, alumnoPlantilla);
                       showToast(`${alumnoPlantilla.nombre} ha sido activado.`, 'success');
-                      // Los listeners de onSnapshot se encargarán de renderizar
+                      // Los listeners de onSnapshot se encargarán de renderizar la UI
                   } else {
                       closeAllLists();
                       return;
@@ -1807,25 +1811,14 @@ function autocomplete(inp) {
 
 // --- REPORTES (ADAPTADO PARA FIRESTORE) ---
 async function populateReportFilters() {
-  const profesores = await getProfesoresFirestore(); // Usa la función de Firestore
-  const proyectos = await getProyectosFirestore(); // Usa la función de Firestore
-
-  const reportProfesorFilter = document.getElementById('reportProfesorFilter');
-  reportProfesorFilter.innerHTML = '<option value="">Todos</option>';
-  profesores.forEach(p => {
-    reportProfesorFilter.innerHTML += `<option value="${p.id}">${p.nombre}</option>`;
-  });
-
-  const reportProyectoFilter = document.getElementById('reportProyectoFilter');
-  reportProyectoFilter.innerHTML = '<option value="">Todos</option>';
-  proyectos.forEach(p => {
-    reportProyectoFilter.innerHTML += `<option value="${p.id}">${p.nombre}</option>`;
-  });
+  // Estos filtros se actualizan automáticamente con los listeners de profesores y proyectos
+  // No es necesario llamar a getProfesoresFirestore() o getProyectosFirestore() aquí directamente
+  // ya que los listeners ya los poblaron.
 }
 
 async function renderReportes() {
-  await populateReportFilters();
-  await applyReportFilters();
+  await populateReportFilters(); // Esto solo actualiza los selects de filtro
+  await applyReportFilters(); // Esto genera el reporte basado en los filtros actuales
 }
 
 async function applyReportFilters() {
@@ -1836,10 +1829,10 @@ async function applyReportFilters() {
   const filterPago = document.getElementById('reportPagoFilter').value;
   const filterKit = document.getElementById('reportKitFilter').value;
 
-  const allAlumnos = await getAlumnosFirestore(); // Usa la función de Firestore
-  const allCupos = await getCuposFirestore(); // Usa la función de Firestore
-  const allProfesores = await getProfesoresFirestore(); // Usa la función de Firestore
-  const allProyectos = await getProyectosFirestore(); // Usa la función de Firestore
+  const allAlumnos = await getAlumnosFirestore();
+  const allCupos = await getCuposFirestore();
+  const allProfesores = await getProfesoresFirestore();
+  const allProyectos = await getProyectosFirestore();
 
   let filteredAlumnos = allAlumnos.filter(alumno => {
     let matches = true;
@@ -1847,14 +1840,14 @@ async function applyReportFilters() {
     // Filtrar por Profesor
     if (filterProfesorId) {
       const cupo = allCupos.find(c => c.id === alumno.cupoId);
-      if (!cupo || cupo.profesorId !== filterProfesorId) { // IDs son strings
+      if (!cupo || cupo.profesorId !== filterProfesorId) {
         matches = false;
       }
     }
 
     // Filtrar por Proyecto
     if (filterProyectoId) {
-      if (alumno.proyectoId !== filterProyectoId) { // IDs son strings
+      if (alumno.proyectoId !== filterProyectoId) {
         matches = false;
       }
     }
@@ -1960,11 +1953,11 @@ async function exportToExcel() {
 
 async function exportToJson() {
   const allData = {
-    alumnos: await getAlumnosFirestore(), // Usa la función de Firestore
-    cupos: await getCuposFirestore(), // Usa la función de Firestore
-    profesores: await getProfesoresFirestore(), // Usa la función de Firestore
-    plantillaAlumnos: await getPlantillaAlumnosFirestore(), // Usa la función de Firestore
-    proyectos: await getProyectosFirestore() // Usa la función de Firestore
+    alumnos: await getAlumnosFirestore(),
+    cupos: await getCuposFirestore(),
+    profesores: await getProfesoresFirestore(),
+    plantillaAlumnos: await getPlantillaAlumnosFirestore(),
+    proyectos: await getProyectosFirestore()
   };
 
   const dataStr = JSON.stringify(allData, null, 2);
@@ -2005,20 +1998,8 @@ async function importJson(event) {
         }
       }
 
-      // Usar un Batch de Firestore para operaciones atómicas
-      const batch = window.db.batch();
-
-      // Mapeos para IDs originales a nuevos IDs de Firestore
-      const profesorIdMap = new Map();
-      const cupoIdMap = new Map();
-      const proyectoIdMap = new Map();
-      const plantillaIdMap = new Map();
-
-      // Borrar datos existentes en cada colección (esto no se puede hacer en un batch directamente)
-      // Tendremos que borrar las colecciones una por una antes de añadir.
-      // Esto es un poco más complejo y puede requerir Cloud Functions para colecciones grandes.
-      // Para colecciones pequeñas, podemos obtener todos los documentos y eliminarlos.
       showToast("Borrando datos existentes...", 'info');
+      // Borrar datos existentes en cada colección
       await Promise.all(expectedStores.map(async (storeName) => {
         const querySnapshot = await window.getDocs(window.collection(window.db, storeName));
         const deleteBatch = window.db.batch();
@@ -2029,11 +2010,18 @@ async function importJson(event) {
       }));
       showToast("Datos existentes borrados. Importando nuevos datos...", 'info');
 
+      const batch = window.db.batch();
+
+      // Mapeos para IDs originales a nuevos IDs de Firestore
+      const profesorIdMap = new Map();
+      const cupoIdMap = new Map();
+      const proyectoIdMap = new Map();
+      const plantillaIdMap = new Map();
 
       // 1. Añadir Profesores
       for (const item of importedData[STORE_PROFESORES_FIRESTORE]) {
         const originalId = item.id;
-        delete item.id; // Firestore generará un nuevo ID
+        delete item.id;
         const newDocRef = window.doc(window.collection(window.db, STORE_PROFESORES_FIRESTORE));
         batch.set(newDocRef, item);
         profesorIdMap.set(originalId, newDocRef.id);
@@ -2187,7 +2175,7 @@ document.addEventListener('DOMContentLoaded',async()=>{
       } else {
         const existingPlantilla = (await getPlantillaAlumnosFirestore()).find(p => p.correo === plantillaData.correo);
         if (existingPlantilla) {
-          plantillaData.observaciones = alumnoOriginal.observaciones;
+          plantillaData.observaciones = existingPlantilla.observaciones; // Mantener observaciones de plantilla si existe
           await updatePlantillaAlumnoFirestore(existingPlantilla.id, plantillaData);
           alumnoData.plantillaId = existingPlantilla.id;
           await updateAlumnoFirestore(idAlumnoEditando, alumnoData);
@@ -2217,7 +2205,7 @@ document.addEventListener('DOMContentLoaded',async()=>{
     }
 
     resetAlumnoForm();
-    // Los listeners de onSnapshot se encargarán de renderizar
+    // Los listeners de onSnapshot se encargarán de renderizar la UI
   });
 
   document.getElementById('btnLimpiarAlumnoForm').addEventListener('click', () => {
@@ -2228,7 +2216,7 @@ document.addEventListener('DOMContentLoaded',async()=>{
 
   document.getElementById('cupoForm').addEventListener('submit',async e=>{
     e.preventDefault();
-    const profesorId = document.getElementById('profesorSelect').value; // ID ya es string
+    const profesorId = document.getElementById('profesorSelect').value;
     if (!profesorId) {
       showToast("Seleccione un profesor válido.", 'warning');
       return;
@@ -2244,13 +2232,13 @@ document.addEventListener('DOMContentLoaded',async()=>{
       horaInicio:horaInicio.value,
       horaFin:horaFin.value,
       cupoMax:parseInt(cupoMax.value),
-      disponibles:parseInt(cupoMax.value) // Inicializar disponibles
+      disponibles:parseInt(cupoMax.value)
     };
-    await addCupoFirestore(c); // Usa la función de Firestore
+    await addCupoFirestore(c);
     e.target.reset();
     fechasTemporalesCupo = [];
     renderFechasSeleccionadas();
-    // Los listeners de onSnapshot se encargarán de renderizar
+    // Los listeners de onSnapshot se encargarán de renderizar la UI
     showToast("Cupo registrado exitosamente.", 'success');
   });
 
@@ -2264,15 +2252,15 @@ document.addEventListener('DOMContentLoaded',async()=>{
     };
 
     if (idProfesorEditando) {
-      await updateProfesorFirestore(idProfesorEditando, profesorData); // Usa la función de Firestore
+      await updateProfesorFirestore(idProfesorEditando, profesorData);
       showToast("Profesor actualizado exitosamente.", 'success');
     } else {
-      await addProfesorFirestore(profesorData); // Usa la función de Firestore
+      await addProfesorFirestore(profesorData);
       showToast("Profesor registrado exitosamente.", 'success');
     }
 
     resetProfesorForm();
-    // Los listeners de onSnapshot se encargarán de renderizar
+    // Los listeners de onSnapshot se encargarán de renderizar la UI
   });
 
   document.getElementById('proyectoForm').addEventListener('submit', async e => {
@@ -2283,15 +2271,15 @@ document.addEventListener('DOMContentLoaded',async()=>{
     };
 
     if (idProyectoEditando) {
-      await updateProyectoFirestore(idProyectoEditando, proyectoData); // Usa la función de Firestore
+      await updateProyectoFirestore(idProyectoEditando, proyectoData);
       showToast("Proyecto actualizado exitosamente.", 'success');
     } else {
-      await addProyectoFirestore(proyectoData); // Usa la función de Firestore
+      await addProyectoFirestore(proyectoData);
       showToast("Proyecto registrado exitosamente.", 'success');
     }
 
     resetProyectoForm();
-    // Los listeners de onSnapshot se encargarán de renderizar
+    // Los listeners de onSnapshot se encargarán de renderizar la UI
   });
 
   document.getElementById('btnGuardarCambioHorario').addEventListener('click', guardarCambioHorario);
