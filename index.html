@@ -762,43 +762,17 @@
   <!-- Script de Bootstrap 5 (¡IMPORTANTE!) -->
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script>
-// --- IndexedDB Constants (ELIMINAR ESTAS LÍNEAS) ---
-// Estas constantes y la variable 'db' ya no son necesarias si te has movido completamente a Firestore.
-// Las dejo comentadas para que sepas qué eliminar.
-/*
-const DB_NAME = 'RegistroDB';
-const DB_VERSION = 13;
-let db;
-*/
-
 // --- Firestore Collection Names ---
-// Define los nombres de tus colecciones en Firestore
 const STORE_ALUMNOS_FIRESTORE = "alumnos";
 const STORE_CUPOS_FIRESTORE = "cupos";
 const STORE_PROFESORES_FIRESTORE = "profesores";
 const STORE_PLANTILLA_ALUMNOS_FIRESTORE = "plantillaAlumnos";
 const STORE_PROYECTOS_FIRESTORE = "proyectos";
 
-
 // Variable global para almacenar los alumnos filtrados para la exportación
 let lastFilteredAlumnos = [];
 
-// --- IndexedDB Generic Helper Functions (ELIMINAR ESTAS FUNCIONES) ---
-// Elimina todas estas funciones relacionadas con IndexedDB.
-/*
-const openDB = () => new Promise((resolve,reject)=>{ ... });
-const addData = (storeName, data) => new Promise((res, rej) => { ... });
-const getAllData = (storeName) => new Promise((res, rej) => { ... });
-const getDataById = (storeName, id) => new Promise((res, rej) => { ... });
-const updateData = (storeName, data) => new Promise((res, rej) => { ... });
-const deleteData = (storeName, id) => new Promise((res, rej) => { ... });
-const clearStore = (storeName, transaction = null) => new Promise((resolve, reject) => { ... });
-*/
-
-// --- Firestore Helper Functions (NUEVO - REEMPLAZAN LAS DE IndexedDB) ---
-// Estas funciones usarán las variables globales (window.db, window.collection, etc.)
-// que definimos en el script type="module" de arriba.
-
+// --- Firestore Helper Functions ---
 // --- ALUMNOS (Firestore) ---
 const addAlumnoFirestore = async (alumnoData) => {
   try {
@@ -1123,9 +1097,6 @@ const deleteProyectoFirestore = async (id) => {
 // Función para buscar en la plantilla por nombre o correo (Firestore)
 const searchPlantillaAlumnosFirestore = async (queryText) => {
   try {
-    // Para búsquedas de autocompletado, es común obtener todos los datos
-    // y filtrar en el cliente si la colección no es demasiado grande.
-    // Para colecciones muy grandes, se usarían consultas de Firestore con 'where'.
     const plantillaAlumnos = await getPlantillaAlumnosFirestore();
     const lowerCaseQuery = queryText.toLowerCase();
     const filtered = plantillaAlumnos.filter(alumno =>
@@ -1204,13 +1175,30 @@ const addFechaToCupo = () => {
 
 const removeFechaFromCupo = (fechaToRemove) => {
   fechasTemporalesCupo = fechasTemporalesCupo.filter(fecha => fecha !== fechaToRemove);
-  renderFechasSeleccionadas();
+  renderFeccionadas();
+};
+
+// --- Variables para almacenar las funciones de desuscripción de los listeners ---
+let unsubscribeProfesores = null;
+let unsubscribeCupos = null;
+let unsubscribeAlumnos = null;
+let unsubscribePlantillaAlumnos = null;
+let unsubscribeProyectos = null;
+
+// Función genérica para desuscribir un listener si está activo
+const unsubscribeIfActive = (unsubscribeFunc) => {
+  if (unsubscribeFunc) {
+    unsubscribeFunc();
+    return null;
+  }
+  return unsubscribeFunc;
 };
 
 
 // Listener en tiempo real para Profesores
 const setupRealtimeProfesoresListener = () => {
-  window.onSnapshot(window.collection(window.db, STORE_PROFESORES_FIRESTORE), (snapshot) => {
+  unsubscribeProfesores = unsubscribeIfActive(unsubscribeProfesores); // Desuscribe el anterior si existe
+  unsubscribeProfesores = window.onSnapshot(window.collection(window.db, STORE_PROFESORES_FIRESTORE), (snapshot) => {
     const lista = document.getElementById('listaProfesores');
     lista.innerHTML = '';
     const profesorSelect = document.getElementById('profesorSelect');
@@ -1237,10 +1225,8 @@ const setupRealtimeProfesoresListener = () => {
       });
     }
     // Después de renderizar profesores, actualiza cupos y alumnos si es necesario
-    // Estos listeners se llaman aquí para asegurar que los selects de profesor estén poblados
-    // antes de que los cupos y alumnos intenten referenciarlos.
-    setupRealtimeCuposListener();
-    setupRealtimeAlumnosListener(); // Este listener también se encarga de actualizar el reporte
+    setupRealtimeCuposListener(); // Llama a este para que los cupos se actualicen con los nuevos profesores
+    setupRealtimeAlumnosListener(); // Llama a este para que los alumnos se actualicen con los nuevos cupos/profesores
   }, (error) => {
     console.error("Error al escuchar cambios en profesores:", error);
     showToast("Error al cargar profesores en tiempo real.", 'danger');
@@ -1249,7 +1235,8 @@ const setupRealtimeProfesoresListener = () => {
 
 // Listener en tiempo real para Cupos
 const setupRealtimeCuposListener = () => {
-  window.onSnapshot(window.collection(window.db, STORE_CUPOS_FIRESTORE), async (snapshot) => {
+  unsubscribeCupos = unsubscribeIfActive(unsubscribeCupos); // Desuscribe el anterior si existe
+  unsubscribeCupos = window.onSnapshot(window.collection(window.db, STORE_CUPOS_FIRESTORE), async (snapshot) => {
     const lista = document.getElementById('listaCupos');
     const selectAlumnoCupoModal = document.getElementById('cupoSelectModal');
     lista.innerHTML = '';
@@ -1279,8 +1266,7 @@ const setupRealtimeCuposListener = () => {
       });
     }
     // Después de renderizar cupos, actualiza alumnos si es necesario
-    // Esto asegura que la lista de alumnos refleje los cambios en los cupos.
-    setupRealtimeAlumnosListener();
+    setupRealtimeAlumnosListener(); // Llama a este para que los alumnos se actualicen con los nuevos cupos
   }, (error) => {
     console.error("Error al escuchar cambios en cupos:", error);
     showToast("Error al cargar cupos en tiempo real.", 'danger');
@@ -1289,7 +1275,8 @@ const setupRealtimeCuposListener = () => {
 
 // Listener en tiempo real para Alumnos
 const setupRealtimeAlumnosListener = () => {
-  window.onSnapshot(window.collection(window.db, STORE_ALUMNOS_FIRESTORE), async (snapshot) => {
+  unsubscribeAlumnos = unsubscribeIfActive(unsubscribeAlumnos); // Desuscribe el anterior si existe
+  unsubscribeAlumnos = window.onSnapshot(window.collection(window.db, STORE_ALUMNOS_FIRESTORE), async (snapshot) => {
     const lista = document.getElementById('listaAlumnos');
     lista.innerHTML = '';
 
@@ -1345,7 +1332,8 @@ const setupRealtimeAlumnosListener = () => {
 
 // Listener en tiempo real para Plantilla de Alumnos
 const setupRealtimePlantillaAlumnosListener = () => {
-  window.onSnapshot(window.collection(window.db, STORE_PLANTILLA_ALUMNOS_FIRESTORE), (snapshot) => {
+  unsubscribePlantillaAlumnos = unsubscribeIfActive(unsubscribePlantillaAlumnos); // Desuscribe el anterior si existe
+  unsubscribePlantillaAlumnos = window.onSnapshot(window.collection(window.db, STORE_PLANTILLA_ALUMNOS_FIRESTORE), (snapshot) => {
     const lista = document.getElementById('listaPlantillaAlumnos');
     lista.innerHTML = '';
 
@@ -1378,7 +1366,8 @@ const setupRealtimePlantillaAlumnosListener = () => {
 
 // Listener en tiempo real para Proyectos
 const setupRealtimeProyectosListener = () => {
-  window.onSnapshot(window.collection(window.db, STORE_PROYECTOS_FIRESTORE), (snapshot) => {
+  unsubscribeProyectos = unsubscribeIfActive(unsubscribeProyectos); // Desuscribe el anterior si existe
+  unsubscribeProyectos = window.onSnapshot(window.collection(window.db, STORE_PROYECTOS_FIRESTORE), (snapshot) => {
     const lista = document.getElementById('listaProyectos');
     lista.innerHTML = '';
     const proyectoSelectModal = document.getElementById('proyectoSelectModal');
@@ -1403,9 +1392,7 @@ const setupRealtimeProyectosListener = () => {
       });
     }
     // Después de renderizar proyectos, actualiza alumnos si es necesario
-    // Esto asegura que la lista de alumnos refleje los cambios en los proyectos.
-    setupRealtimeAlumnosListener();
-    applyReportFilters(); // Para actualizar los filtros de reporte
+    setupRealtimeAlumnosListener(); // Llama a este para que los alumnos se actualicen con los nuevos proyectos
   }, (error) => {
     console.error("Error al escuchar cambios en proyectos:", error);
     showToast("Error al cargar proyectos en tiempo real.", 'danger');
@@ -1416,21 +1403,20 @@ const setupRealtimeProyectosListener = () => {
 // --- ACCIONES ALUMNOS (ADAPTADO PARA FIRESTORE) ---
 async function eliminarAlumno(id, cupoId){
   if(confirm("¿Estás seguro de eliminar este alumno de la inscripción actual? Esto liberará su cupo.")){
-    await deleteAlumnoFirestore(id); // Usa la función de Firestore
+    await deleteAlumnoFirestore(id);
     if (cupoId) {
-      const cupo = await getCupoByIdFirestore(cupoId); // Usa la función de Firestore
+      const cupo = await getCupoByIdFirestore(cupoId);
       if(cupo){
         cupo.disponibles++;
-        await updateCupoFirestore(cupo.id, cupo); // Usa la función de Firestore
+        await updateCupoFirestore(cupo.id, cupo);
       }
     }
-    // Los listeners de onSnapshot se encargarán de renderizar la UI
     showToast("Alumno eliminado de la inscripción actual exitosamente.", 'success');
   }
 }
 
 async function editarAlumno(id) {
-  const alumno = await getAlumnoByIdFirestore(id); // Usa la función de Firestore
+  const alumno = await getAlumnoByIdFirestore(id);
   if (!alumno) {
     showToast("Alumno no encontrado.", 'danger');
     return;
@@ -1463,7 +1449,7 @@ function resetAlumnoForm() {
 let modalCambiarHorarioInstance;
 
 async function abrirModalCambiarHorario(alumnoId) {
-  const alumno = await getAlumnoByIdFirestore(alumnoId); // Usa la función de Firestore
+  const alumno = await getAlumnoByIdFirestore(alumnoId);
   if (!alumno) {
     showToast("Alumno no encontrado.", 'danger');
     return;
@@ -1472,7 +1458,6 @@ async function abrirModalCambiarHorario(alumnoId) {
   document.getElementById('alumnoIdCambiarHorario').value = alumno.id;
   document.getElementById('nombreAlumnoCambiarHorario').textContent = alumno.nombre;
 
-  // El select de cupos se actualiza automáticamente con setupRealtimeCuposListener
   document.getElementById('cupoSelectModal').value = alumno.cupoId || '';
 
   modalCambiarHorarioInstance = new bootstrap.Modal(document.getElementById('modalCambiarHorario'));
@@ -1532,8 +1517,6 @@ async function guardarCambioHorario() {
 
   showToast(`Horario de ${alumno.nombre} actualizado exitosamente.`, 'success');
   modalCambiarHorarioInstance.hide();
-
-  // Los listeners de onSnapshot se encargarán de renderizar la UI
 }
 
 let modalAsignarProyectoInstance;
@@ -1548,7 +1531,6 @@ async function abrirModalAsignarProyecto(alumnoId) {
   document.getElementById('alumnoIdAsignarProyecto').value = alumno.id;
   document.getElementById('nombreAlumnoAsignarProyecto').textContent = alumno.nombre;
 
-  // El select de proyectos se actualiza automáticamente con setupRealtimeProyectosListener
   const proyectoSelectModal = document.getElementById('proyectoSelectModal');
   proyectoSelectModal.value = alumno.proyectoId || '';
   document.getElementById('pagoSelectModal').value = alumno.pago || '';
@@ -1581,8 +1563,6 @@ async function guardarProyectoAlumno() {
   const nombreProyecto = nuevoProyectoId ? (await getProyectoByIdFirestore(nuevoProyectoId)).nombre : 'Sin Proyecto';
   showToast(`Proyecto y detalles de ${alumno.nombre} actualizados a "${nombreProyecto}" exitosamente.`, 'success');
   modalAsignarProyectoInstance.hide();
-
-  // Los listeners de onSnapshot se encargarán de renderizar la UI
 }
 
 
@@ -1595,7 +1575,6 @@ async function eliminarCupo(id){
   }
   if(confirm("¿Estás seguro de eliminar este cupo? Esta acción no se puede deshacer.")){
     await deleteCupoFirestore(id);
-    // Los listeners de onSnapshot se encargarán de renderizar la UI
     showToast("Cupo eliminado exitosamente.", 'success');
   }
 }
@@ -1627,7 +1606,6 @@ async function eliminarProfesor(id) {
   }
   if (confirm("¿Estás seguro de eliminar este profesor? Esta acción no se puede deshacer.")) {
     await deleteProfesorFirestore(id);
-    // Los listeners de onSnapshot se encargarán de renderizar la UI
     showToast("Profesor eliminado exitosamente.", 'success');
   }
 }
@@ -1650,7 +1628,6 @@ async function editarPlantillaAlumnoEstado(id) {
   if (confirm(`¿Cambiar el estado de ${alumnoPlantilla.nombre} a "${nuevoEstado}"?`)) {
     alumnoPlantilla.estado = nuevoEstado;
     await updatePlantillaAlumnoFirestore(alumnoPlantilla.id, alumnoPlantilla);
-    // Los listeners de onSnapshot se encargarán de renderizar la UI
     showToast(`Estado de ${alumnoPlantilla.nombre} actualizado a "${nuevoEstado}".`, 'success');
   }
 }
@@ -1658,7 +1635,6 @@ async function editarPlantillaAlumnoEstado(id) {
 async function eliminarPlantillaAlumno(id) {
   if (confirm("¿Estás seguro de eliminar este alumno de la plantilla? Esto no afectará a los alumnos actualmente inscritos, pero no podrá ser buscado para futuras reinscripciones.")) {
     await deletePlantillaAlumnoFirestore(id);
-    // Los listeners de onSnapshot se encargarán de renderizar la UI
     showToast("Alumno eliminado de la plantilla exitosamente.", 'success');
   }
 }
@@ -1689,7 +1665,6 @@ async function eliminarProyecto(id) {
 
   if (confirm("¿Estás seguro de eliminar este proyecto? Esta acción no se puede deshacer.")) {
     await deleteProyectoFirestore(id);
-    // Los listeners de onSnapshot se encargarán de renderizar la UI
     showToast("Proyecto eliminado exitosamente.", 'success');
   }
 }
@@ -1741,7 +1716,6 @@ function autocomplete(inp) {
                       alumnoPlantilla.estado = 'Activo';
                       await updatePlantillaAlumnoFirestore(plantillaId, alumnoPlantilla);
                       showToast(`${alumnoPlantilla.nombre} ha sido activado.`, 'success');
-                      // Los listeners de onSnapshot se encargarán de renderizar la UI
                   } else {
                       closeAllLists();
                       return;
@@ -1817,8 +1791,8 @@ async function populateReportFilters() {
 }
 
 async function renderReportes() {
-  await populateReportFilters(); // Esto solo actualiza los selects de filtro
-  await applyReportFilters(); // Esto genera el reporte basado en los filtros actuales
+  await populateReportFilters();
+  await applyReportFilters();
 }
 
 async function applyReportFilters() {
@@ -2103,20 +2077,17 @@ async function importJson(event) {
 
 // --- EVENTOS ---
 document.addEventListener('DOMContentLoaded',async()=>{
-  // Elimina la llamada a openDB() si ya no usas IndexedDB
-  // await openDB();
-
   // Inicia los listeners en tiempo real para tus colecciones
   // Es importante que los listeners se llamen en un orden que tenga sentido
   // Por ejemplo, profesores antes que cupos, y cupos antes que alumnos.
   setupRealtimeProfesoresListener();
-  setupRealtimeProyectosListener(); // Proyectos también puede ir antes de alumnos
+  setupRealtimeProyectosListener();
   setupRealtimePlantillaAlumnosListener();
   // setupRealtimeCuposListener() y setupRealtimeAlumnosListener()
   // se llaman dentro de los listeners de profesores y proyectos para asegurar
   // que los datos relacionados estén disponibles.
 
-  renderFechasSeleccionadas(); // Esto no depende de la DB, solo de fechasTemporalesCupo
+  renderFechasSeleccionadas();
 
   autocomplete(document.getElementById("buscarAlumno"));
 
@@ -2137,7 +2108,7 @@ document.addEventListener('DOMContentLoaded',async()=>{
       kit: '',
       cupoId: null,
       proyectoId: null,
-      plantillaId: idAlumnoPlantilla || null // Firestore IDs son strings
+      plantillaId: idAlumnoPlantilla || null
     };
 
     let plantillaData = {
@@ -2175,7 +2146,7 @@ document.addEventListener('DOMContentLoaded',async()=>{
       } else {
         const existingPlantilla = (await getPlantillaAlumnosFirestore()).find(p => p.correo === plantillaData.correo);
         if (existingPlantilla) {
-          plantillaData.observaciones = existingPlantilla.observaciones; // Mantener observaciones de plantilla si existe
+          plantillaData.observaciones = existingPlantilla.observaciones;
           await updatePlantillaAlumnoFirestore(existingPlantilla.id, plantillaData);
           alumnoData.plantillaId = existingPlantilla.id;
           await updateAlumnoFirestore(idAlumnoEditando, alumnoData);
@@ -2191,7 +2162,7 @@ document.addEventListener('DOMContentLoaded',async()=>{
       if (!idAlumnoPlantilla) {
         const existingPlantilla = (await getPlantillaAlumnosFirestore()).find(p => p.correo === plantillaData.correo);
         if (existingPlantilla) {
-          plantillaData.observaciones = existingPlantilla.observaciones; // Mantener observaciones de plantilla si existe
+          plantillaData.observaciones = existingPlantilla.observaciones;
           await updatePlantillaAlumnoFirestore(existingPlantilla.id, plantillaData);
           alumnoData.plantillaId = existingPlantilla.id;
         } else {
@@ -2205,7 +2176,6 @@ document.addEventListener('DOMContentLoaded',async()=>{
     }
 
     resetAlumnoForm();
-    // Los listeners de onSnapshot se encargarán de renderizar la UI
   });
 
   document.getElementById('btnLimpiarAlumnoForm').addEventListener('click', () => {
@@ -2238,7 +2208,6 @@ document.addEventListener('DOMContentLoaded',async()=>{
     e.target.reset();
     fechasTemporalesCupo = [];
     renderFechasSeleccionadas();
-    // Los listeners de onSnapshot se encargarán de renderizar la UI
     showToast("Cupo registrado exitosamente.", 'success');
   });
 
@@ -2260,7 +2229,6 @@ document.addEventListener('DOMContentLoaded',async()=>{
     }
 
     resetProfesorForm();
-    // Los listeners de onSnapshot se encargarán de renderizar la UI
   });
 
   document.getElementById('proyectoForm').addEventListener('submit', async e => {
@@ -2279,7 +2247,6 @@ document.addEventListener('DOMContentLoaded',async()=>{
     }
 
     resetProyectoForm();
-    // Los listeners de onSnapshot se encargarán de renderizar la UI
   });
 
   document.getElementById('btnGuardarCambioHorario').addEventListener('click', guardarCambioHorario);
@@ -2287,7 +2254,14 @@ document.addEventListener('DOMContentLoaded',async()=>{
   document.getElementById('btnGuardarProyecto').addEventListener('click', guardarProyectoAlumno);
 
   // Evento para la pestaña de reportes
-  document.getElementById('reportes-tab').addEventListener('shown.bs.tab', renderReportes);
+  // Desuscribe el listener de reportes cuando la pestaña se oculta
+  const reportesTabElement = document.getElementById('reportes-tab');
+  reportesTabElement.addEventListener('shown.bs.tab', renderReportes);
+  reportesTabElement.addEventListener('hidden.bs.tab', () => {
+    // No hay un listener onSnapshot directo para reportes, solo se renderiza al mostrar
+    // Pero si tuvieras uno, lo desuscribirías aquí.
+  });
+
   document.getElementById('btnApplyReportFilters').addEventListener('click', applyReportFilters);
   document.getElementById('btnExportExcel').addEventListener('click', exportToExcel);
   document.getElementById('btnExportJson').addEventListener('click', exportToJson);
@@ -2297,6 +2271,49 @@ document.addEventListener('DOMContentLoaded',async()=>{
     document.getElementById('jsonFileInput').click();
   });
   document.getElementById('jsonFileInput').addEventListener('change', importJson);
+
+
+  // --- Manejo de cambio de pestañas para desuscribir listeners ---
+  const myTabEl = document.getElementById('myTab');
+  myTabEl.addEventListener('hide.bs.tab', event => {
+    const activeTabId = event.target.id; // ID de la pestaña que se está ocultando
+
+    // Desuscribe los listeners asociados a la pestaña que se oculta
+    if (activeTabId === 'profesores-tab') {
+      unsubscribeProfesores = unsubscribeIfActive(unsubscribeProfesores);
+    } else if (activeTabId === 'cupos-tab') {
+      unsubscribeCupos = unsubscribeIfActive(unsubscribeCupos);
+    } else if (activeTabId === 'lista-tab') {
+      unsubscribeAlumnos = unsubscribeIfActive(unsubscribeAlumnos);
+    } else if (activeTabId === 'plantilla-tab') {
+      unsubscribePlantillaAlumnos = unsubscribeIfActive(unsubscribePlantillaAlumnos);
+    } else if (activeTabId === 'proyectos-tab') {
+      unsubscribeProyectos = unsubscribeIfActive(unsubscribeProyectos);
+    }
+    // No es necesario desuscribir para 'registro-tab' o 'reportes-tab'
+    // a menos que tuvieran listeners onSnapshot directos que no se manejen ya.
+  });
+
+  // Al mostrar una pestaña, asegúrate de que su listener se active
+  myTabEl.addEventListener('show.bs.tab', event => {
+    const targetTabId = event.target.id; // ID de la pestaña que se va a mostrar
+
+    if (targetTabId === 'profesores-tab') {
+      setupRealtimeProfesoresListener();
+    } else if (targetTabId === 'cupos-tab') {
+      setupRealtimeCuposListener();
+    } else if (targetTabId === 'lista-tab') {
+      setupRealtimeAlumnosListener();
+    } else if (targetTabId === 'plantilla-tab') {
+      setupRealtimePlantillaAlumnosListener();
+    } else if (targetTabId === 'proyectos-tab') {
+      setupRealtimeProyectosListener();
+    } else if (targetTabId === 'reportes-tab') {
+      renderReportes(); // Los reportes se renderizan al mostrar la pestaña
+    }
+    // 'registro-tab' no tiene un listener onSnapshot directo para su contenido principal
+  });
+
 });
 </script>
 </body>
