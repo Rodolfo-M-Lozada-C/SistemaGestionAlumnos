@@ -1,0 +1,2080 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sistema de Gestión de Alumnos y Cupos</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" rel="stylesheet">
+  <!-- CDN para SheetJS (librería para exportar a Excel) -->
+  <script src="https://unpkg.com/xlsx/dist/xlsx.full.min.js"></script>
+  <style>
+    :root {
+      --primary-color: #6f42c1; /* Morado */
+      --secondary-color: #6c757d; /* Gris */
+      --success-color: #28a745; /* Verde */
+      --info-color: #17a2b8; /* Azul claro */
+      --warning-color: #ffc107; /* Amarillo */
+      --danger-color: #dc3545; /* Rojo */
+      --light-bg: #f8f9fa;
+      --dark-text: #343a40;
+      --card-bg: #ffffff;
+    }
+
+    body {
+      font-family: 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      background-color: var(--light-bg);
+      color: var(--dark-text);
+      line-height: 1.6;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin-top: 30px;
+      margin-bottom: 30px;
+    }
+
+    h1 {
+      color: var(--primary-color);
+      font-weight: 700;
+      margin-bottom: 30px;
+      text-align: center;
+      position: relative;
+    }
+    h1::after {
+      content: '';
+      display: block;
+      width: 80px;
+      height: 4px;
+      background-color: var(--primary-color);
+      margin: 15px auto 0;
+      border-radius: 2px;
+    }
+
+    .card {
+      border-radius: 15px;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+      border: none;
+      background-color: var(--card-bg);
+      margin-bottom: 25px;
+    }
+
+    .card-header {
+      border-radius: 15px 15px 0 0 !important;
+      font-size: 1.35rem;
+      font-weight: 600;
+      padding: 1.25rem 1.5rem;
+      color: white;
+      background-color: var(--primary-color); /* Default header color */
+      border-bottom: none;
+    }
+    .card-header.bg-primary { background-color: var(--primary-color) !important; }
+    .card-header.bg-success { background-color: var(--success-color) !important; }
+    .card-header.bg-info { background-color: var(--info-color) !important; }
+    .card-header.bg-secondary { background-color: var(--secondary-color) !important; }
+
+
+    .nav-tabs {
+      border-bottom: 2px solid var(--primary-color);
+      margin-bottom: 25px;
+    }
+    .nav-tabs .nav-link {
+      color: var(--dark-text);
+      border: none;
+      border-bottom: 3px solid transparent;
+      padding: 12px 20px;
+      font-weight: 500;
+      transition: all 0.3s ease;
+    }
+    .nav-tabs .nav-link:hover {
+      color: var(--primary-color);
+      border-color: var(--primary-color);
+    }
+    .nav-tabs .nav-link.active {
+      color: var(--primary-color);
+      background-color: transparent;
+      border-color: var(--primary-color);
+      font-weight: 600;
+    }
+
+    .form-group-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 1.5rem;
+    }
+    .form-group-full {
+      grid-column: 1 / -1;
+    }
+
+    .form-control, .form-select {
+      border-radius: 8px;
+      border: 1px solid #ced4da;
+      padding: 0.75rem 1rem;
+      transition: all 0.3s ease;
+    }
+    .form-control:focus, .form-select:focus {
+      border-color: var(--primary-color);
+      box-shadow: 0 0 0 0.25rem rgba(111, 66, 193, 0.25); /* primary-color with alpha */
+    }
+
+    .btn {
+      border-radius: 8px;
+      padding: 0.75rem 1.5rem;
+      font-weight: 600;
+      transition: all 0.3s ease;
+    }
+    .btn-primary { background-color: var(--primary-color); border-color: var(--primary-color); }
+    .btn-primary:hover { background-color: #5a36a3; border-color: #5a36a3; } /* Darker primary */
+    .btn-info { background-color: var(--info-color); border-color: var(--info-color); }
+    .btn-info:hover { background-color: #138496; border-color: #138496; } /* Darker info */
+    .btn-warning { background-color: var(--warning-color); border-color: var(--warning-color); color: var(--dark-text); }
+    .btn-warning:hover { background-color: #e0a800; border-color: #e0a800; }
+    .btn-danger { background-color: var(--danger-color); border-color: var(--danger-color); }
+    .btn-danger:hover { background-color: #bd2130; border-color: #bd2130; }
+    .btn-secondary { background-color: var(--secondary-color); border-color: var(--secondary-color); }
+    .btn-secondary:hover { background-color: #545b62; border-color: #545b62; }
+
+    .table {
+      margin-top: 15px;
+      border-radius: 10px;
+      overflow: hidden; /* Ensures rounded corners for table */
+    }
+    .table thead th {
+      background-color: var(--primary-color);
+      color: white;
+      border-bottom: none;
+      padding: 1rem;
+    }
+    .table tbody tr:nth-of-type(odd) {
+      background-color: rgba(0,0,0,.03);
+    }
+    .table tbody tr:hover {
+      background-color: rgba(111, 66, 193, 0.1); /* Light hover effect */
+    }
+    .table td, .table th {
+      vertical-align: middle;
+      border-top: 1px solid #dee2e6;
+      padding: 0.85rem;
+    }
+
+    /* Autocomplete styles */
+    .autocomplete-items {
+      position: absolute;
+      border: 1px solid #d4d4d4;
+      border-bottom: none;
+      border-top: none;
+      z-index: 99;
+      top: 100%;
+      left: 0;
+      right: 0;
+      max-height: 200px;
+      overflow-y: auto;
+      background-color: var(--card-bg);
+      border-radius: 0 0 8px 8px;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+    }
+    .autocomplete-items div {
+      padding: 10px;
+      cursor: pointer;
+      background-color: var(--card-bg);
+      border-bottom: 1px solid #e9ecef;
+      transition: background-color 0.2s ease;
+    }
+    .autocomplete-items div:hover {
+      background-color: #e9e9e9;
+    }
+    .autocomplete-active {
+      background-color: var(--primary-color) !important;
+      color: #ffffff;
+    }
+    .autocomplete-active strong {
+      color: #ffffff;
+    }
+
+    /* Estilos para las fechas seleccionadas */
+    .fecha-tag {
+      display: inline-block;
+      background-color: var(--primary-color);
+      color: white;
+      padding: 5px 10px;
+      border-radius: 5px;
+      margin: 5px;
+      font-size: 0.9em;
+    }
+    .fecha-tag .btn-close-tag {
+      background: none;
+      border: none;
+      color: white;
+      font-size: 0.8em;
+      margin-left: 5px;
+      cursor: pointer;
+    }
+
+    /* Estilos para los toasts */
+    .toast-container {
+      position: fixed;
+      top: 1rem;
+      right: 1rem;
+      z-index: 1080; /* Higher than modals */
+    }
+    .toast {
+      border-radius: 0.5rem;
+      box-shadow: 0 0.5rem 1rem rgba(0,0,0,0.15);
+      border: none;
+    }
+    .toast-header {
+      border-bottom: none;
+      font-weight: 600;
+      color: white;
+      padding: 0.75rem 1rem;
+      border-radius: 0.5rem 0.5rem 0 0;
+    }
+    .toast-body {
+      padding: 1rem;
+      color: var(--dark-text);
+    }
+    .toast.bg-success .toast-header { background-color: var(--success-color); }
+    .toast.bg-danger .toast-header { background-color: var(--danger-color); }
+    .toast.bg-info .toast-header { background-color: var(--info-color); }
+    .toast.bg-warning .toast-header { background-color: var(--warning-color); color: var(--dark-text); }
+    .toast-header .btn-close {
+      filter: invert(1) grayscale(100%) brightness(200%); /* Make close button white */
+    }
+
+    /* Ajuste para los select de Pago y Kit en el modal */
+    #modalAsignarProyecto .form-group-grid > div {
+      flex: 1; /* Distribute space evenly */
+      min-width: unset; /* Override min-width for smaller selects */
+    }
+    #modalAsignarProyecto .form-select {
+      padding: 0.5rem 0.75rem; /* Make selects smaller */
+      font-size: 0.9rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1><i class="fas fa-graduation-cap me-2"></i>Sistema de Gestión de Alumnos y Cupos</h1>
+
+    <ul class="nav nav-tabs mb-4" id="myTab" role="tablist">
+      <li class="nav-item" role="presentation">
+        <button class="nav-link active" id="registro-tab" data-bs-toggle="tab" data-bs-target="#registro" type="button" role="tab" aria-controls="registro" aria-selected="true">
+          <i class="fas fa-user-plus me-2"></i>Registro de Alumnos
+        </button>
+      </li>
+      <li class="nav-item" role="presentation">
+        <button class="nav-link" id="lista-tab" data-bs-toggle="tab" data-bs-target="#lista" type="button" role="tab" aria-controls="lista" aria-selected="false">
+          <i class="fas fa-users me-2"></i>Alumnos Inscritos
+        </button>
+      </li>
+      <li class="nav-item" role="presentation">
+        <button class="nav-link" id="plantilla-tab" data-bs-toggle="tab" data-bs-target="#plantilla" type="button" role="tab" aria-controls="plantilla" aria-selected="false">
+          <i class="fas fa-address-book me-2"></i>Alumnos Registrados
+        </button>
+      </li>
+      <li class="nav-item" role="presentation">
+        <button class="nav-link" id="cupos-tab" data-bs-toggle="tab" data-bs-target="#cupos" type="button" role="tab" aria-controls="cupos" aria-selected="false">
+          <i class="fas fa-calendar-alt me-2"></i>Cupos
+        </button>
+      </li>
+      <li class="nav-item" role="presentation">
+        <button class="nav-link" id="profesores-tab" data-bs-toggle="tab" data-bs-target="#profesores" type="button" role="tab" aria-controls="profesores" aria-selected="false">
+          <i class="fas fa-chalkboard-teacher me-2"></i>Profesores
+        </button>
+      </li>
+      <!-- Nueva pestaña para Proyectos -->
+      <li class="nav-item" role="presentation">
+        <button class="nav-link" id="proyectos-tab" data-bs-toggle="tab" data-bs-target="#proyectos" type="button" role="tab" aria-controls="proyectos" aria-selected="false">
+          <i class="fas fa-project-diagram me-2"></i>Proyectos
+        </button>
+      </li>
+      <!-- Nueva pestaña para Reportes -->
+      <li class="nav-item" role="presentation">
+        <button class="nav-link" id="reportes-tab" data-bs-toggle="tab" data-bs-target="#reportes" type="button" role="tab" aria-controls="reportes" aria-selected="false">
+          <i class="fas fa-chart-bar me-2"></i>Reportes
+        </button>
+      </li>
+    </ul>
+
+    <div class="tab-content" id="myTabContent">
+      <!-- Registro de Alumnos -->
+      <div class="tab-pane fade show active" id="registro" role="tabpanel" aria-labelledby="registro-tab">
+        <div class="card">
+          <div class="card-header bg-primary text-white"><i class="fas fa-user-plus me-2"></i>Registro de Alumnos</div>
+          <div class="card-body">
+            <form id="alumnoForm">
+              <input type="hidden" id="idAlumnoEditando">
+              <input type="hidden" id="idAlumnoPlantilla">
+
+              <div class="mb-4">
+                <label for="buscarAlumno" class="form-label fw-bold">Buscar Alumno Existente para Reinscripción</label>
+                <div class="position-relative">
+                  <input type="text" class="form-control" id="buscarAlumno" placeholder="Buscar por nombre o correo electrónico">
+                  <div id="autocompleteList" class="autocomplete-items"></div>
+                </div>
+                <small class="form-text text-muted">Empieza a escribir para buscar alumnos registrados previamente.</small>
+              </div>
+
+              <div class="form-group-grid">
+                <div><label for="nombre" class="form-label">Nombre Completo</label><input type="text" class="form-control" id="nombre" required></div>
+                <div><label for="nivel" class="form-label">Nivel</label>
+                  <select class="form-select" id="nivel" required>
+                    <option value="">Seleccione</option>
+                    <option value="De cero">De cero</option>
+                    <option value="Basico">Básico</option>
+                    <option value="Intermedio">Intermedio</option>
+                    <option value="Avanzado">Avanzado</option>
+                  </select>
+                </div>
+                <div><label for="telefono" class="form-label">Teléfono</label><input type="tel" class="form-control" id="telefono" required></div>
+                <div><label for="correo" class="form-label">Correo Electrónico</label><input type="email" class="form-control" id="correo" required></div>
+                <div><label for="estatus" class="form-label">Estatus</label>
+                  <select class="form-select" id="estatus" required>
+                    <option value="">Seleccione</option>
+                    <option value="Recurrente">Recurrente</option>
+                    <option value="Nuevo">Nuevo</option>
+                    <option value="Ya no asiste">Ya no asiste</option>
+                  </select>
+                </div>
+                <!-- El select de horario se ha movido al modal de "Alumnos Inscritos" -->
+              </div>
+              <div class="d-grid gap-2 d-md-flex justify-content-md-end mt-4">
+                <button type="submit" class="btn btn-primary" id="btnRegistrarAlumno"><i class="fas fa-save me-2"></i>Registrar Alumno</button>
+                <button type="button" class="btn btn-secondary" id="btnLimpiarAlumnoForm"><i class="fas fa-eraser me-2"></i>Limpiar Formulario</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+
+      <!-- Lista de Alumnos Inscritos (Activos en un cupo) -->
+      <div class="tab-pane fade" id="lista" role="tabpanel" aria-labelledby="lista-tab">
+        <div class="card">
+          <div class="card-header bg-success text-white"><i class="fas fa-users me-2"></i>Alumnos Inscritos (Activos en un Cupo)</div>
+          <div class="card-body">
+            <div class="table-responsive">
+              <table class="table table-striped table-hover">
+                <thead>
+                  <tr>
+                    <th>Nombre</th>
+                    <th>Nivel</th>
+                    <th>Horario</th>
+                    <th>Proyecto Asignado</th>
+                    <th>Pago</th> <!-- Nueva columna -->
+                    <th>Kit</th> <!-- Nueva columna -->
+                    <th>Observaciones</th>
+                    <th>Estatus</th>
+                    <th>Acciones</th>
+                  </tr>
+                </thead>
+                <tbody id="listaAlumnos"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Lista de Alumnos Registrados (Plantilla) -->
+      <div class="tab-pane fade" id="plantilla" role="tabpanel" aria-labelledby="plantilla-tab">
+        <div class="card">
+          <div class="card-header bg-secondary text-white"><i class="fas fa-address-book me-2"></i>Alumnos Registrados (Plantilla)</div>
+          <div class="card-body">
+            <div class="table-responsive">
+              <table class="table table-striped table-hover">
+                <thead>
+                  <tr>
+                    <th>Nombre</th>
+                    <th>Correo</th>
+                    <th>Teléfono</th>
+                    <th>Nivel Preferido</th>
+                    <th>Observaciones</th>
+                    <th>Estado</th>
+                    <th>Acciones</th>
+                  </tr>
+                </thead>
+                <tbody id="listaPlantillaAlumnos"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Cupos -->
+      <div class="tab-pane fade" id="cupos" role="tabpanel" aria-labelledby="cupos-tab">
+        <div class="card mb-4">
+          <div class="card-header bg-primary text-white"><i class="fas fa-calendar-plus me-2"></i>Registro de Nuevos Cupos</div>
+          <div class="card-body">
+            <form id="cupoForm">
+              <div class="form-group-grid">
+                <div><label for="profesorSelect" class="form-label">Profesor</label>
+                  <select class="form-select" id="profesorSelect" required>
+                    <option value="">Seleccione un profesor</option>
+                  </select>
+                </div>
+                <div>
+                  <label for="fechaCupoIndividual" class="form-label">Añadir Fechas</label>
+                  <div class="input-group">
+                    <input type="date" class="form-control" id="fechaCupoIndividual">
+                    <button class="btn btn-outline-secondary" type="button" id="btnAddFechaCupo"><i class="fas fa-plus"></i> Añadir</button>
+                  </div>
+                  <div id="fechasSeleccionadasContainer" class="mt-2">
+                    <!-- Aquí se mostrarán las fechas seleccionadas -->
+                  </div>
+                  <input type="hidden" id="fechasCupoHidden" required> <!-- Campo oculto para el submit -->
+                </div>
+                <div><label for="horaInicio" class="form-label">Hora Inicio</label><input type="time" class="form-control" id="horaInicio" required></div>
+                <div><label for="horaFin" class="form-label">Hora Fin</label><input type="time" class="form-control" id="horaFin" required></div>
+                <div><label for="cupoMax" class="form-label">Cupo (Máx. Personas)</label><input type="number" class="form-control" id="cupoMax" required min="1"></div>
+              </div>
+              <div class="d-grid mt-4">
+                <button type="submit" class="btn btn-primary"><i class="fas fa-plus-circle me-2"></i>Registrar Cupo</button>
+              </div>
+            </form>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header bg-success text-white"><i class="fas fa-list-alt me-2"></i>Lista de Cupos Disponibles</div>
+          <div class="card-body">
+            <div class="table-responsive">
+              <table class="table table-striped table-hover">
+                <thead>
+                  <tr>
+                    <th>Profesor</th>
+                    <th>Fechas</th> <!-- Cambiado a Fechas -->
+                    <th>Horario</th>
+                    <th>Cupo Disponible</th>
+                    <th>Acciones</th>
+                  </tr>
+                </thead>
+                <tbody id="listaCupos"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Profesores -->
+      <div class="tab-pane fade" id="profesores" role="tabpanel" aria-labelledby="profesores-tab">
+        <div class="card mb-4">
+          <div class="card-header bg-info text-white"><i class="fas fa-user-tie me-2"></i>Registro de Profesores</div>
+          <div class="card-body">
+            <form id="profesorForm">
+              <input type="hidden" id="idProfesorEditando">
+              <div class="form-group-grid">
+                <div><label for="nombreProfesor" class="form-label">Nombre Completo</label><input type="text" class="form-control" id="nombreProfesor" required></div>
+                <div><label for="correoProfesor" class="form-label">Correo Electrónico</label><input type="email" class="form-control" id="correoProfesor" required></div>
+                <div><label for="telefonoProfesor" class="form-label">Teléfono</label><input type="tel" class="form-control" id="telefonoProfesor"></div>
+              </div>
+              <div class="d-grid mt-4">
+                <button type="submit" class="btn btn-info" id="btnRegistrarProfesor"><i class="fas fa-user-plus me-2"></i>Registrar Profesor</button>
+              </div>
+            </form>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header bg-success text-white"><i class="fas fa-users-cog me-2"></i>Lista de Profesores</div>
+          <div class="card-body">
+            <div class="table-responsive">
+              <table class="table table-striped table-hover">
+                <thead>
+                  <tr>
+                    <th>Nombre</th>
+                    <th>Correo</th>
+                    <th>Teléfono</th>
+                    <th>Acciones</th>
+                  </tr>
+                </thead>
+                <tbody id="listaProfesores"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Proyectos -->
+      <div class="tab-pane fade" id="proyectos" role="tabpanel" aria-labelledby="proyectos-tab">
+        <div class="card mb-4">
+          <div class="card-header bg-info text-white"><i class="fas fa-folder-plus me-2"></i>Registro de Proyectos</div>
+          <div class="card-body">
+            <form id="proyectoForm">
+              <input type="hidden" id="idProyectoEditando">
+              <div class="form-group-grid">
+                <div><label for="nombreProyecto" class="form-label">Nombre del Proyecto</label><input type="text" class="form-control" id="nombreProyecto" required></div>
+              </div>
+              <div class="d-grid mt-4">
+                <button type="submit" class="btn btn-info" id="btnRegistrarProyecto"><i class="fas fa-save me-2"></i>Registrar Proyecto</button>
+              </div>
+            </form>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header bg-success text-white"><i class="fas fa-list-alt me-2"></i>Lista de Proyectos</div>
+          <div class="card-body">
+            <div class="table-responsive">
+              <table class="table table-striped table-hover">
+                <thead>
+                  <tr>
+                    <th>Nombre</th>
+                    <th>Acciones</th>
+                  </tr>
+                </thead>
+                <tbody id="listaProyectos"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Reportes -->
+      <div class="tab-pane fade" id="reportes" role="tabpanel" aria-labelledby="reportes-tab">
+        <div class="card mb-4">
+          <div class="card-header bg-info text-white"><i class="fas fa-filter me-2"></i>Filtros de Reporte</div>
+          <div class="card-body">
+            <div class="form-group-grid">
+              <div>
+                <label for="reportProfesorFilter" class="form-label">Profesor</label>
+                <select class="form-select" id="reportProfesorFilter">
+                  <option value="">Todos</option>
+                </select>
+              </div>
+              <div>
+                <label for="reportProyectoFilter" class="form-label">Proyecto</label>
+                <select class="form-select" id="reportProyectoFilter">
+                  <option value="">Todos</option>
+                </select>
+              </div>
+              <div>
+                <label for="reportNivelFilter" class="form-label">Nivel</label>
+                <select class="form-select" id="reportNivelFilter">
+                  <option value="">Todos</option>
+                  <option value="De cero">De cero</option>
+                  <option value="Basico">Básico</option>
+                  <option value="Intermedio">Intermedio</option>
+                  <option value="Avanzado">Avanzado</option>
+                </select>
+              </div>
+              <div>
+                <label for="reportEstatusFilter" class="form-label">Estatus</label>
+                <select class="form-select" id="reportEstatusFilter">
+                  <option value="">Todos</option>
+                  <option value="Recurrente">Recurrente</option>
+                  <option value="Nuevo">Nuevo</option>
+                  <option value="Ya no asiste">Ya no asiste</option>
+                </select>
+              </div>
+              <div>
+                <label for="reportPagoFilter" class="form-label">Pago</label>
+                <select class="form-select" id="reportPagoFilter">
+                  <option value="">Todos</option>
+                  <option value="Adelanto">Adelanto</option>
+                  <option value="50%">50%</option>
+                  <option value="100%">100%</option>
+                  <option value="N/A">N/A</option>
+                </select>
+              </div>
+              <div>
+                <label for="reportKitFilter" class="form-label">Kit</label>
+                <select class="form-select" id="reportKitFilter">
+                  <option value="">Todos</option>
+                  <option value="Completo">Completo</option>
+                  <option value="Basico">Básico</option>
+                  <option value="N/A">N/A</option>
+                </select>
+              </div>
+            </div>
+            <div class="d-grid gap-2 d-md-flex justify-content-md-end mt-4">
+              <button type="button" class="btn btn-primary" id="btnApplyReportFilters"><i class="fas fa-search me-2"></i>Generar Reporte</button>
+              <button type="button" class="btn btn-success" id="btnExportExcel" disabled><i class="fas fa-file-excel me-2"></i>Exportar a Excel</button>
+              <button type="button" class="btn btn-secondary" id="btnExportJson"><i class="fas fa-file-code me-2"></i>Exportar a JSON</button>
+              <button type="button" class="btn btn-info" id="btnImportJson"><i class="fas fa-file-import me-2"></i>Importar JSON</button>
+              <input type="file" id="jsonFileInput" accept=".json" style="display: none;">
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header bg-primary text-white"><i class="fas fa-table me-2"></i>Resultados del Reporte</div>
+          <div class="card-body">
+            <div class="table-responsive">
+              <table class="table table-striped table-hover">
+                <thead>
+                  <tr>
+                    <th>Nombre</th>
+                    <th>Nivel</th>
+                    <th>Horario</th>
+                    <th>Proyecto Asignado</th>
+                    <th>Pago</th>
+                    <th>Kit</th>
+                    <th>Observaciones</th>
+                    <th>Estatus</th>
+                  </tr>
+                </thead>
+                <tbody id="reportResults">
+                  <tr><td colspan="8" class="text-center">No hay datos para mostrar. Aplique los filtros.</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Modal para Cambiar Horario -->
+  <div class="modal fade" id="modalCambiarHorario" tabindex="-1" aria-labelledby="modalCambiarHorarioLabel" aria-hidden="true">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header bg-info text-white">
+          <h5 class="modal-title" id="modalCambiarHorarioLabel"><i class="fas fa-calendar-check me-2"></i>Cambiar Horario del Alumno</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <input type="hidden" id="alumnoIdCambiarHorario">
+          <p>Alumno: <strong id="nombreAlumnoCambiarHorario"></strong></p>
+          <div class="mb-3">
+            <label for="cupoSelectModal" class="form-label">Seleccionar Nuevo Horario</label>
+            <select class="form-select" id="cupoSelectModal" required></select>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button type="button" class="btn btn-primary" id="btnGuardarCambioHorario">Guardar Cambio</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal para Asignar Proyecto (anteriormente Curso) -->
+  <div class="modal fade" id="modalAsignarProyecto" tabindex="-1" aria-labelledby="modalAsignarProyectoLabel" aria-hidden="true">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header bg-primary text-white">
+          <h5 class="modal-title" id="modalAsignarProyectoLabel"><i class="fas fa-project-diagram me-2"></i>Asignar Proyecto y Detalles del Alumno</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <input type="hidden" id="alumnoIdAsignarProyecto">
+          <p>Alumno: <strong id="nombreAlumnoAsignarProyecto"></strong></p>
+          <div class="mb-3">
+            <label for="proyectoSelectModal" class="form-label">Seleccionar Proyecto</label>
+            <select class="form-select" id="proyectoSelectModal" required>
+              <option value="">Sin Proyecto</option>
+              <!-- Opciones de proyectos se cargarán dinámicamente aquí -->
+            </select>
+          </div>
+          <div class="form-group-grid mb-3"> <!-- Usamos form-group-grid para Pago y Kit -->
+            <div>
+              <label for="pagoSelectModal" class="form-label">PAGO</label>
+              <select class="form-select" id="pagoSelectModal" required>
+                <option value="">Seleccione opción de pago</option>
+                <option value="Adelanto">Adelanto</option>
+                <option value="50%">50%</option>
+                <option value="100%">100%</option>
+              </select>
+            </div>
+            <div>
+              <label for="kitSelectModal" class="form-label">KIT</label>
+              <select class="form-select" id="kitSelectModal" required>
+                <option value="">Seleccione opción de kit</option>
+                <option value="Completo">Completo</option>
+                <option value="Basico">Básico</option>
+              </select>
+            </div>
+          </div>
+          <div class="mb-3">
+            <label for="observacionesModal" class="form-label">Observaciones del Alumno</label>
+            <textarea class="form-control" id="observacionesModal" rows="3" placeholder="Notas adicionales (no obligatorio)"></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button type="button" class="btn btn-primary" id="btnGuardarProyecto">Guardar Proyecto y Detalles</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Contenedor para Toasts (Notificaciones) -->
+  <div class="toast-container">
+    <!-- Toasts se insertarán aquí dinámicamente -->
+  </div>
+
+  <!-- Script de Bootstrap 5 (¡IMPORTANTE!) -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+const DB_NAME = 'RegistroDB';
+const DB_VERSION = 13; // Incrementado la versión de la DB para añadir los campos 'pago' y 'kit'
+let db;
+const STORE_ALUMNOS = 'alumnos';
+const STORE_CUPOS = 'cupos';
+const STORE_PROFESORES = 'profesores';
+const STORE_PLANTILLA_ALUMNOS = 'plantillaAlumnos';
+const STORE_PROYECTOS = 'proyectos';
+
+// Variable global para almacenar los alumnos filtrados para la exportación
+let lastFilteredAlumnos = [];
+
+const openDB = () => new Promise((resolve,reject)=>{
+  const request = indexedDB.open(DB_NAME, DB_VERSION);
+  request.onupgradeneeded = e=>{
+    db = e.target.result;
+
+    // Alumnos Store
+    if (!db.objectStoreNames.contains(STORE_ALUMNOS)) {
+      const alumnosStore = db.createObjectStore(STORE_ALUMNOS,{keyPath:'id',autoIncrement:true});
+      alumnosStore.createIndex('cupoId', 'cupoId', { unique: false });
+      alumnosStore.createIndex('plantillaId', 'plantillaId', { unique: false });
+      alumnosStore.createIndex('proyectoId', 'proyectoId', { unique: false });
+      alumnosStore.createIndex('observaciones', 'observaciones', { unique: false });
+      alumnosStore.createIndex('pago', 'pago', { unique: false }); // Nuevo índice para pago
+      alumnosStore.createIndex('kit', 'kit', { unique: false });   // Nuevo índice para kit
+    } else {
+      const transaction = e.target.transaction;
+      const alumnosStore = transaction.objectStore(STORE_ALUMNOS);
+      if (!alumnosStore.indexNames.contains('observaciones')) {
+        alumnosStore.createIndex('observaciones', 'observaciones', { unique: false });
+      }
+      if (!alumnosStore.indexNames.contains('pago')) {
+        alumnosStore.createIndex('pago', 'pago', { unique: false });
+      }
+      if (!alumnosStore.indexNames.contains('kit')) {
+        alumnosStore.createIndex('kit', 'kit', { unique: false });
+      }
+    }
+    
+    // Cupos Store
+    if (!db.objectStoreNames.contains(STORE_CUPOS)) db.createObjectStore(STORE_CUPOS,{keyPath:'id',autoIncrement:true});
+    
+    // Profesores Store
+    if (!db.objectStoreNames.contains(STORE_PROFESORES)) db.createObjectStore(STORE_PROFESORES,{keyPath:'id',autoIncrement:true});
+    
+    // Plantilla Alumnos Store
+    if (!db.objectStoreNames.contains(STORE_PLANTILLA_ALUMNOS)) {
+      const plantillaStore = db.createObjectStore(STORE_PLANTILLA_ALUMNOS,{keyPath:'id',autoIncrement:true});
+      plantillaStore.createIndex('nombre', 'nombre', { unique: false });
+      plantillaStore.createIndex('correo', 'correo', { unique: true });
+      plantillaStore.createIndex('estado', 'estado', { unique: false });
+      plantillaStore.createIndex('observaciones', 'observaciones', { unique: false });
+    } else {
+      const transaction = e.target.transaction;
+      const plantillaStore = transaction.objectStore(STORE_PLANTILLA_ALUMNOS);
+      if (!plantillaStore.indexNames.contains('observaciones')) {
+        plantillaStore.createIndex('observaciones', 'observaciones', { unique: false });
+      }
+    }
+
+    // Proyectos Store
+    if (!db.objectStoreNames.contains(STORE_PROYECTOS)) {
+      db.createObjectStore(STORE_PROYECTOS,{keyPath:'id',autoIncrement:true});
+    }
+  };
+  request.onsuccess = e=>{db=e.target.result;resolve(db);};
+  request.onerror = e=>reject(e.target.error);
+});
+
+// --- IndexedDB Generic Helper Functions ---
+const addData = (storeName, data) => new Promise((res, rej) => {
+  const tx = db.transaction(storeName, 'readwrite');
+  const store = tx.objectStore(storeName);
+  const request = store.add(data);
+  
+  tx.oncomplete = () => res(request.result);
+  tx.onerror = e => rej(e.target.error);
+  tx.onabort = e => rej(e.target.error);
+});
+
+const getAllData = (storeName) => new Promise((res, rej) => {
+  const tx = db.transaction(storeName, 'readonly');
+  const req = tx.objectStore(storeName).getAll();
+  req.onsuccess = () => res(req.result);
+  req.onerror = e => rej(e.target.error);
+});
+
+const getDataById = (storeName, id) => new Promise((res, rej) => {
+  const tx = db.transaction(storeName, 'readonly');
+  const req = tx.objectStore(storeName).get(id);
+  req.onsuccess = () => res(req.result);
+  req.onerror = e => rej(e.target.error);
+});
+
+const updateData = (storeName, data) => new Promise((res, rej) => {
+  const tx = db.transaction(storeName, 'readwrite');
+  const store = tx.objectStore(storeName);
+  const request = store.put(data);
+
+  tx.oncomplete = () => res(request.result);
+  tx.onerror = e => rej(e.target.error);
+  tx.onabort = e => rej(e.target.error);
+});
+
+const deleteData = (storeName, id) => new Promise((res, rej) => {
+  const tx = db.transaction(storeName, 'readwrite');
+  const store = tx.objectStore(storeName);
+  store.delete(id);
+
+  tx.oncomplete = () => res();
+  tx.onerror = e => rej(e.target.error);
+  tx.onabort = e => rej(e.target.error);
+});
+
+// Función para borrar todos los datos de un Object Store
+const clearStore = (storeName, transaction = null) => new Promise((resolve, reject) => {
+  const currentTx = transaction || db.transaction(storeName, 'readwrite');
+  const objectStore = currentTx.objectStore(storeName);
+  const request = objectStore.clear();
+
+  request.onsuccess = () => {
+    if (!transaction) { // Only resolve if it's a standalone transaction
+      resolve();
+    }
+  };
+
+  request.onerror = (event) => {
+    reject(event.target.error);
+  };
+
+  if (transaction) { // If part of a larger transaction, don't resolve/reject here
+    resolve(); // Resolve immediately, actual transaction completion handles errors
+  }
+});
+
+
+// --- CUPOS ---
+const addCupo = (c) => {
+  const processedCupo = { 
+    ...c, 
+    disponibles: c.cupoMax,
+    fechas: Array.isArray(c.fechas) ? c.fechas : c.fechas.split(',').map(f => f.trim()).filter(f => f)
+  };
+  return addData(STORE_CUPOS, processedCupo);
+};
+const getCupos = () => getAllData(STORE_CUPOS);
+const getCupoById = (id) => getDataById(STORE_CUPOS, id);
+const updateCupo = (c) => {
+  const processedCupo = { 
+    ...c, 
+    fechas: Array.isArray(c.fechas) ? c.fechas : c.fechas.split(',').map(f => f.trim()).filter(f => f)
+  };
+  return updateData(STORE_CUPOS, processedCupo);
+};
+const deleteCupo = (id) => deleteData(STORE_CUPOS, id);
+
+// --- ALUMNOS ---
+const addAlumno = (a) => addData(STORE_ALUMNOS, a);
+const getAlumnos = () => getAllData(STORE_ALUMNOS);
+const getAlumnoById = (id) => getDataById(STORE_ALUMNOS, id);
+const updateAlumno = (a) => updateData(STORE_ALUMNOS, a);
+const deleteAlumno = (id) => deleteData(STORE_ALUMNOS, id);
+
+// --- PROFESORES ---
+const addProfesor = (p) => addData(STORE_PROFESORES, p);
+const getProfesores = () => getAllData(STORE_PROFESORES);
+const getProfesorById = (id) => getDataById(STORE_PROFESORES, id);
+const updateProfesor = (p) => updateData(STORE_PROFESORES, p);
+const deleteProfesor = (id) => deleteData(STORE_PROFESORES, id);
+
+// --- PLANTILLA ALUMNOS ---
+const addPlantillaAlumno = (p) => addData(STORE_PLANTILLA_ALUMNOS, p);
+const getPlantillaAlumnos = () => getAllData(STORE_PLANTILLA_ALUMNOS);
+const getPlantillaAlumnoById = (id) => getDataById(STORE_PLANTILLA_ALUMNOS, id);
+const updatePlantillaAlumno = (p) => updateData(STORE_PLANTILLA_ALUMNOS, p);
+const deletePlantillaAlumno = (id) => deleteData(STORE_PLANTILLA_ALUMNOS, id);
+
+// --- PROYECTOS ---
+const addProyecto = (p) => addData(STORE_PROYECTOS, p);
+const getProyectos = () => getAllData(STORE_PROYECTOS);
+const getProyectoById = (id) => getDataById(STORE_PROYECTOS, id);
+const updateProyecto = (p) => updateData(STORE_PROYECTOS, p);
+const deleteProyecto = (id) => deleteData(STORE_PROYECTOS, id);
+
+
+// Función para buscar en la plantilla por nombre o correo
+const searchPlantillaAlumnos = (query) => new Promise((resolve, reject) => {
+  const tx = db.transaction(STORE_PLANTILLA_ALUMNOS, 'readonly');
+  const store = tx.objectStore(STORE_PLANTILLA_ALUMNOS);
+  const results = [];
+  const lowerCaseQuery = query.toLowerCase();
+
+  const uniqueResults = new Set();
+
+  store.getAll().onsuccess = (event) => {
+    const allPlantilla = event.target.result;
+    const filtered = allPlantilla.filter(alumno =>
+      (alumno.nombre && alumno.nombre.toLowerCase().includes(lowerCaseQuery)) ||
+      (alumno.correo && alumno.correo.toLowerCase().includes(lowerCaseQuery))
+    );
+    resolve(filtered);
+  };
+  store.getAll().onerror = e => reject(e.target.error);
+});
+
+// --- NOTIFICACIONES (TOASTS) ---
+function showToast(message, type = 'info', title = 'Notificación') {
+  const toastContainer = document.querySelector('.toast-container');
+  const toastId = `toast-${Date.now()}`;
+  const toastHtml = `
+    <div id="${toastId}" class="toast align-items-center text-white bg-${type} border-0" role="alert" aria-live="assertive" aria-atomic="true" data-bs-delay="5000">
+      <div class="d-flex">
+        <div class="toast-body">
+          ${message}
+        </div>
+        <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+      </div>
+    </div>
+  `;
+  // Para tener un título en el toast, se puede usar el siguiente formato:
+  // <div class="toast-header bg-${type}">
+  //   <strong class="me-auto">${title}</strong>
+  //   <button type="button" class="btn-close btn-close-white" data-bs-dismiss="toast" aria-label="Close"></button>
+  // </div>
+  // <div class="toast-body">
+  //   ${message}
+  // </div>
+
+  toastContainer.insertAdjacentHTML('beforeend', toastHtml);
+  const toastElement = document.getElementById(toastId);
+  const toast = new bootstrap.Toast(toastElement);
+  toast.show();
+
+  // Eliminar el toast del DOM después de que se oculte
+  toastElement.addEventListener('hidden.bs.toast', () => {
+    toastElement.remove();
+  });
+}
+
+
+// --- RENDER ---
+const renderProfesores = async () => {
+  const lista = document.getElementById('listaProfesores');
+  lista.innerHTML = '';
+  const profesorSelect = document.getElementById('profesorSelect');
+  profesorSelect.innerHTML = '<option value="">Seleccione un profesor</option>';
+
+  const profesores = await getProfesores();
+  profesores.forEach(p => {
+    lista.innerHTML += `<tr>
+      <td>${p.nombre}</td>
+      <td>${p.correo}</td>
+      <td>${p.telefono || 'N/A'}</td>
+      <td>
+        <button class="btn btn-warning btn-sm me-2" onclick="editarProfesor(${p.id})" title="Editar"><i class="fas fa-edit"></i></button>
+        <button class="btn btn-danger btn-sm" onclick="eliminarProfesor(${p.id})" title="Eliminar"><i class="fas fa-trash-alt"></i></button>
+      </td>
+    </tr>`;
+    profesorSelect.innerHTML += `<option value="${p.id}">${p.nombre}</option>`;
+  });
+};
+
+let fechasTemporalesCupo = []; // Array para almacenar las fechas seleccionadas para un nuevo cupo
+
+const renderFechasSeleccionadas = () => {
+  const container = document.getElementById('fechasSeleccionadasContainer');
+  container.innerHTML = '';
+  if (fechasTemporalesCupo.length === 0) {
+    container.innerHTML = '<small class="text-muted">No hay fechas seleccionadas.</small>';
+  } else {
+    fechasTemporalesCupo.sort().forEach(fecha => { // Opcional: ordenar las fechas
+      container.innerHTML += `
+        <span class="fecha-tag">
+          ${fecha}
+          <button type="button" class="btn-close-tag" onclick="removeFechaFromCupo('${fecha}')">x</button>
+        </span>
+      `;
+    });
+  }
+  // Actualizar el campo oculto para el submit
+  document.getElementById('fechasCupoHidden').value = fechasTemporalesCupo.join(',');
+};
+
+const addFechaToCupo = () => {
+  const fechaInput = document.getElementById('fechaCupoIndividual');
+  const fecha = fechaInput.value;
+  if (fecha && !fechasTemporalesCupo.includes(fecha)) {
+    fechasTemporalesCupo.push(fecha);
+    renderFechasSeleccionadas();
+    fechaInput.value = ''; // Limpiar el input después de añadir
+  } else if (fecha && fechasTemporalesCupo.includes(fecha)) {
+    showToast('Esta fecha ya ha sido añadida.', 'warning');
+  } else {
+    showToast('Por favor, seleccione una fecha.', 'warning');
+  }
+};
+
+const removeFechaFromCupo = (fechaToRemove) => {
+  fechasTemporalesCupo = fechasTemporalesCupo.filter(fecha => fecha !== fechaToRemove);
+  renderFechasSeleccionadas();
+};
+
+
+const renderCupos=async()=>{
+  const lista=document.getElementById('listaCupos');
+  const selectAlumnoCupoModal=document.getElementById('cupoSelectModal'); // Para el modal
+  lista.innerHTML=''; 
+  selectAlumnoCupoModal.innerHTML='<option value="">Seleccione un horario</option>'; // Para el modal
+
+  const profesores = await getProfesores();
+  const cupos = await getCupos();
+
+  for (const c of cupos) {
+    const profesor = profesores.find(p => p.id === c.profesorId);
+    const nombreProfesor = profesor ? profesor.nombre : 'N/A';
+
+    const fechasTexto = Array.isArray(c.fechas) ? c.fechas.join(', ') : c.fechas;
+
+    lista.innerHTML+=`<tr>
+      <td>${nombreProfesor}</td>
+      <td>${fechasTexto}</td>
+      <td>${c.horaInicio} - ${c.horaFin}</td>
+      <td>${c.disponibles}/${c.cupoMax}</td>
+      <td><button class="btn btn-danger btn-sm" onclick="eliminarCupo(${c.id})" title="Eliminar"><i class="fas fa-trash-alt"></i></button></td>
+    </tr>`;
+    if(c.disponibles > 0){
+      selectAlumnoCupoModal.innerHTML+=`<option value="${c.id}">${nombreProfesor} - ${fechasTexto} (${c.horaInicio}-${c.horaFin}) [${c.disponibles} disponibles]</option>`;
+    }
+  }
+};
+
+const renderAlumnos=async()=>{
+  const lista=document.getElementById('listaAlumnos');
+  lista.innerHTML='';
+  const cupos=await getCupos();
+  const profesores = await getProfesores();
+  const alumnos = await getAlumnos();
+  const proyectos = await getProyectos();
+
+  alumnos.forEach(a=>{
+    const cupo=cupos.find(c=>c.id===a.cupoId);
+    let horarioTexto = 'N/A';
+    if (cupo) {
+      const profesor = profesores.find(p => p.id === cupo.profesorId);
+      const nombreProfesor = profesor ? profesor.nombre : 'N/A';
+      const fechasTexto = Array.isArray(cupo.fechas) ? cupo.fechas.join(', ') : cupo.fechas;
+      horarioTexto = `${nombreProfesor} - ${fechasTexto} ${cupo.horaInicio}-${cupo.horaFin}`;
+    }
+
+    const proyectoAsignado = proyectos.find(p => p.id === a.proyectoId);
+    const nombreProyectoAsignado = proyectoAsignado ? proyectoAsignado.nombre : 'Sin Proyecto';
+
+    lista.innerHTML+=`<tr>
+      <td>${a.nombre}</td>
+      <td>${a.nivel}</td>
+      <td>${horarioTexto}</td>
+      <td>${nombreProyectoAsignado}</td>
+      <td>${a.pago || 'N/A'}</td> <!-- Mostrar pago -->
+      <td>${a.kit || 'N/A'}</td>   <!-- Mostrar kit -->
+      <td>${a.observaciones || 'N/A'}</td>
+      <td>${a.estatus}</td>
+      <td>
+        <button class="btn btn-warning btn-sm me-2" onclick="editarAlumno(${a.id})" title="Editar Datos"><i class="fas fa-edit"></i></button>
+        <button class="btn btn-info btn-sm me-2" onclick="abrirModalCambiarHorario(${a.id})" title="Cambiar Horario"><i class="fas fa-calendar-check"></i></button>
+        <button class="btn btn-primary btn-sm me-2" onclick="abrirModalAsignarProyecto(${a.id})" title="Asignar Proyecto y Detalles"><i class="fas fa-project-diagram"></i></button>
+        <button class="btn btn-danger btn-sm" onclick="eliminarAlumno(${a.id},${a.cupoId})" title="Eliminar Inscripción"><i class="fas fa-trash-alt"></i></button>
+      </td>
+    </tr>`;
+  });
+};
+
+const renderPlantillaAlumnos = async () => {
+  const lista = document.getElementById('listaPlantillaAlumnos');
+  lista.innerHTML = '';
+  const plantillaAlumnos = await getPlantillaAlumnos();
+
+  plantillaAlumnos.forEach(p => {
+    const estadoClass = p.estado === 'Activo' ? 'badge bg-success' : 'badge bg-danger';
+    lista.innerHTML += `<tr>
+      <td>${p.nombre}</td>
+      <td>${p.correo || 'N/A'}</td>
+      <td>${p.telefono || 'N/A'}</td>
+      <td>${p.nivel || 'N/A'}</td>
+      <td>${p.observaciones || 'N/A'}</td>
+      <td><span class="${estadoClass}">${p.estado || 'N/A'}</span></td>
+      <td>
+        <button class="btn btn-info btn-sm me-2" onclick="editarPlantillaAlumnoEstado(${p.id})" title="Cambiar Estado"><i class="fas fa-toggle-on"></i></button>
+        <button class="btn btn-danger btn-sm" onclick="eliminarPlantillaAlumno(${p.id})" title="Eliminar de Plantilla"><i class="fas fa-user-times"></i></button>
+      </td>
+    </tr>`;
+  });
+};
+
+const renderProyectos = async () => {
+  const lista = document.getElementById('listaProyectos');
+  lista.innerHTML = '';
+  const proyectos = await getProyectos();
+
+  proyectos.forEach(p => {
+    lista.innerHTML += `<tr>
+      <td>${p.nombre}</td>
+      <td>
+        <button class="btn btn-warning btn-sm me-2" onclick="editarProyecto(${p.id})" title="Editar"><i class="fas fa-edit"></i></button>
+        <button class="btn btn-danger btn-sm" onclick="eliminarProyecto(${p.id})" title="Eliminar"><i class="fas fa-trash-alt"></i></button>
+      </td>
+    </tr>`;
+  });
+};
+
+
+// --- ACCIONES ALUMNOS ---
+async function eliminarAlumno(id,cupoId){
+  if(confirm("¿Estás seguro de eliminar este alumno de la inscripción actual? Esto liberará su cupo.")){
+    await deleteAlumno(id);
+    if (cupoId) {
+      const cupo = await getCupoById(cupoId);
+      if(cupo){
+        cupo.disponibles++;
+        await updateCupo(cupo);
+      }
+    }
+    await renderAlumnos();
+    await renderCupos();
+    showToast("Alumno eliminado de la inscripción actual exitosamente.", 'success');
+  }
+}
+
+async function editarAlumno(id) {
+  const alumno = await getAlumnoById(id);
+  if (!alumno) {
+    showToast("Alumno no encontrado.", 'danger');
+    return;
+  }
+
+  document.getElementById('nombre').value = alumno.nombre;
+  document.getElementById('nivel').value = alumno.nivel;
+  document.getElementById('telefono').value = alumno.telefono;
+  document.getElementById('correo').value = alumno.correo;
+  document.getElementById('estatus').value = alumno.estatus;
+  document.getElementById('idAlumnoPlantilla').value = alumno.plantillaId || '';
+
+  document.getElementById('idAlumnoEditando').value = alumno.id;
+  document.getElementById('btnRegistrarAlumno').innerHTML = '<i class="fas fa-save me-2"></i>Guardar Cambios';
+  document.getElementById('buscarAlumno').value = '';
+
+  const tabRegistro = new bootstrap.Tab(document.getElementById('registro-tab'));
+  tabRegistro.show();
+}
+
+function resetAlumnoForm() {
+  document.getElementById('alumnoForm').reset();
+  document.getElementById('idAlumnoEditando').value = '';
+  document.getElementById('idAlumnoPlantilla').value = '';
+  document.getElementById('btnRegistrarAlumno').innerHTML = '<i class="fas fa-save me-2"></i>Registrar Alumno';
+  document.getElementById('buscarAlumno').value = '';
+  closeAllLists();
+}
+
+let modalCambiarHorarioInstance;
+
+async function abrirModalCambiarHorario(alumnoId) {
+  const alumno = await getAlumnoById(alumnoId);
+  if (!alumno) {
+    showToast("Alumno no encontrado.", 'danger');
+    return;
+  }
+
+  document.getElementById('alumnoIdCambiarHorario').value = alumno.id;
+  document.getElementById('nombreAlumnoCambiarHorario').textContent = alumno.nombre;
+
+  await renderCupos(); 
+  document.getElementById('cupoSelectModal').value = alumno.cupoId || '';
+  
+  modalCambiarHorarioInstance = new bootstrap.Modal(document.getElementById('modalCambiarHorario'));
+  modalCambiarHorarioInstance.show();
+}
+
+async function guardarCambioHorario() {
+  const alumnoId = parseInt(document.getElementById('alumnoIdCambiarHorario').value);
+  const nuevoCupoId = parseInt(document.getElementById('cupoSelectModal').value);
+
+  if (!nuevoCupoId) {
+    showToast("Por favor, seleccione un nuevo horario.", 'warning');
+    return;
+  }
+
+  const alumno = await getAlumnoById(alumnoId);
+  if (!alumno) {
+    showToast("Error: Alumno no encontrado.", 'danger');
+    return;
+  }
+
+  if (alumno.cupoId === nuevoCupoId) {
+    showToast("El alumno ya está en este horario.", 'info');
+    modalCambiarHorarioInstance.hide();
+    return;
+  }
+
+  if (alumno.cupoId) {
+    const cupoAnterior = await getCupoById(alumno.cupoId);
+    if (cupoAnterior) {
+      cupoAnterior.disponibles++;
+      await updateCupo(cupoAnterior);
+    }
+  }
+
+  const nuevoCupo = await getCupoById(nuevoCupoId);
+  if (!nuevoCupo || nuevoCupo.disponibles <= 0) {
+    showToast("El nuevo horario seleccionado está lleno o no existe.", 'danger');
+    if (alumno.cupoId) {
+      const cupoAnteriorRevert = await getCupoById(alumno.cupoId);
+      if (cupoAnteriorRevert) {
+        cupoAnteriorRevert.disponibles--;
+        await updateCupo(cupoAnteriorRevert);
+      }
+    }
+    return;
+  }
+  nuevoCupo.disponibles--;
+  await updateCupo(nuevoCupo);
+
+  alumno.cupoId = nuevoCupoId;
+  await updateAlumno(alumno);
+
+  showToast(`Horario de ${alumno.nombre} actualizado exitosamente.`, 'success');
+  modalCambiarHorarioInstance.hide();
+
+  await renderAlumnos();
+  await renderCupos();
+}
+
+let modalAsignarProyectoInstance;
+
+async function abrirModalAsignarProyecto(alumnoId) {
+  const alumno = await getAlumnoById(alumnoId);
+  if (!alumno) {
+    showToast("Alumno no encontrado.", 'danger');
+    return;
+  }
+
+  document.getElementById('alumnoIdAsignarProyecto').value = alumno.id;
+  document.getElementById('nombreAlumnoAsignarProyecto').textContent = alumno.nombre;
+
+  const proyectos = await getProyectos();
+  const proyectoSelectModal = document.getElementById('proyectoSelectModal');
+  proyectoSelectModal.innerHTML = '<option value="">Sin Proyecto</option>';
+  proyectos.forEach(p => {
+    proyectoSelectModal.innerHTML += `<option value="${p.id}">${p.nombre}</option>`;
+  });
+
+  proyectoSelectModal.value = alumno.proyectoId || '';
+  document.getElementById('pagoSelectModal').value = alumno.pago || ''; // Cargar pago
+  document.getElementById('kitSelectModal').value = alumno.kit || '';   // Cargar kit
+  document.getElementById('observacionesModal').value = alumno.observaciones || ''; // Cargar observaciones en el modal
+
+  modalAsignarProyectoInstance = new bootstrap.Modal(document.getElementById('modalAsignarProyecto'));
+  modalAsignarProyectoInstance.show();
+}
+
+async function guardarProyectoAlumno() {
+  const alumnoId = parseInt(document.getElementById('alumnoIdAsignarProyecto').value);
+  const nuevoProyectoId = document.getElementById('proyectoSelectModal').value;
+  const nuevoPago = document.getElementById('pagoSelectModal').value;
+  const nuevoKit = document.getElementById('kitSelectModal').value;
+  const nuevasObservaciones = document.getElementById('observacionesModal').value.trim();
+
+  const alumno = await getAlumnoById(alumnoId);
+  if (!alumno) {
+    showToast("Error: Alumno no encontrado.", 'danger');
+    return;
+  }
+
+  alumno.proyectoId = nuevoProyectoId ? parseInt(nuevoProyectoId) : null;
+  alumno.pago = nuevoPago;
+  alumno.kit = nuevoKit;
+  alumno.observaciones = nuevasObservaciones;
+  await updateAlumno(alumno);
+
+  const nombreProyecto = nuevoProyectoId ? (await getProyectoById(parseInt(nuevoProyectoId))).nombre : 'Sin Proyecto';
+  showToast(`Proyecto y detalles de ${alumno.nombre} actualizados a "${nombreProyecto}" exitosamente.`, 'success');
+  modalAsignarProyectoInstance.hide();
+
+  await renderAlumnos();
+}
+
+
+// --- ACCIONES CUPOS ---
+async function eliminarCupo(id){
+  const alumnos=await getAlumnos();
+  if(alumnos.some(a=>a.cupoId===id)){
+    showToast("No se puede eliminar un cupo con alumnos asignados. Por favor, reasigne o elimine los alumnos de este cupo primero.", 'danger');
+    return;
+  }
+  if(confirm("¿Estás seguro de eliminar este cupo? Esta acción no se puede deshacer.")){
+    await deleteCupo(id);
+    await renderCupos();
+    await renderAlumnos();
+    showToast("Cupo eliminado exitosamente.", 'success');
+  }
+}
+
+// --- ACCIONES PROFESORES ---
+async function editarProfesor(id) {
+  const profesor = await getProfesorById(id);
+  if (!profesor) {
+    showToast("Profesor no encontrado.", 'danger');
+    return;
+  }
+
+  document.getElementById('nombreProfesor').value = profesor.nombre;
+  document.getElementById('correoProfesor').value = profesor.correo;
+  document.getElementById('telefonoProfesor').value = profesor.telefono;
+
+  document.getElementById('idProfesorEditando').value = profesor.id;
+  document.getElementById('btnRegistrarProfesor').innerHTML = '<i class="fas fa-save me-2"></i>Guardar Cambios';
+
+  const tabProfesores = new bootstrap.Tab(document.getElementById('profesores-tab'));
+  tabProfesores.show();
+}
+
+async function eliminarProfesor(id) {
+  const cupos = await getCupos();
+  if (cupos.some(c => c.profesorId === id)) {
+    showToast("No se puede eliminar un profesor que tiene cupos asignados. Elimine los cupos de este profesor primero.", 'danger');
+    return;
+  }
+  if (confirm("¿Estás seguro de eliminar este profesor? Esta acción no se puede deshacer.")) {
+    await deleteProfesor(id);
+    await renderProfesores();
+    await renderCupos();
+    await renderAlumnos();
+    showToast("Profesor eliminado exitosamente.", 'success');
+  }
+}
+
+function resetProfesorForm() {
+  document.getElementById('profesorForm').reset();
+  document.getElementById('idProfesorEditando').value = '';
+  document.getElementById('btnRegistrarProfesor').innerHTML = '<i class="fas fa-user-plus me-2"></i>Registrar Profesor';
+}
+
+// --- ACCIONES PLANTILLA ALUMNOS ---
+async function editarPlantillaAlumnoEstado(id) {
+  const alumnoPlantilla = await getPlantillaAlumnoById(id);
+  if (!alumnoPlantilla) {
+    showToast("Alumno de plantilla no encontrado.", 'danger');
+    return;
+  }
+
+  const nuevoEstado = alumnoPlantilla.estado === 'Activo' ? 'Inactivo' : 'Activo';
+  if (confirm(`¿Cambiar el estado de ${alumnoPlantilla.nombre} a "${nuevoEstado}"?`)) {
+    alumnoPlantilla.estado = nuevoEstado;
+    await updatePlantillaAlumno(alumnoPlantilla);
+    await renderPlantillaAlumnos();
+    autocomplete(document.getElementById("buscarAlumno"));
+    showToast(`Estado de ${alumnoPlantilla.nombre} actualizado a "${nuevoEstado}".`, 'success');
+  }
+}
+
+async function eliminarPlantillaAlumno(id) {
+  if (confirm("¿Estás seguro de eliminar este alumno de la plantilla? Esto no afectará a los alumnos actualmente inscritos, pero no podrá ser buscado para futuras reinscripciones.")) {
+    await deletePlantillaAlumno(id);
+    await renderPlantillaAlumnos();
+    autocomplete(document.getElementById("buscarAlumno"));
+    showToast("Alumno eliminado de la plantilla exitosamente.", 'success');
+  }
+}
+
+// --- ACCIONES PROYECTOS ---
+async function editarProyecto(id) {
+  const proyecto = await getProyectoById(id);
+  if (!proyecto) {
+    showToast("Proyecto no encontrado.", 'danger');
+    return;
+  }
+
+  document.getElementById('nombreProyecto').value = proyecto.nombre;
+
+  document.getElementById('idProyectoEditando').value = proyecto.id;
+  document.getElementById('btnRegistrarProyecto').innerHTML = '<i class="fas fa-save me-2"></i>Guardar Cambios';
+
+  const tabProyectos = new bootstrap.Tab(document.getElementById('proyectos-tab'));
+  tabProyectos.show();
+}
+
+async function eliminarProyecto(id) {
+  const alumnos = await getAlumnos();
+  if (alumnos.some(a => a.proyectoId === id)) {
+    showToast("No se puede eliminar un proyecto que tiene alumnos asignados. Por favor, desasigne los alumnos de este proyecto primero.", 'danger');
+    return;
+  }
+
+  if (confirm("¿Estás seguro de eliminar este proyecto? Esta acción no se puede deshacer.")) {
+    await deleteProyecto(id);
+    await renderProyectos();
+    showToast("Proyecto eliminado exitosamente.", 'success');
+  }
+}
+
+function resetProyectoForm() {
+  document.getElementById('proyectoForm').reset();
+  document.getElementById('idProyectoEditando').value = '';
+  document.getElementById('btnRegistrarProyecto').innerHTML = '<i class="fas fa-save me-2"></i>Registrar Proyecto';
+}
+
+
+// --- Autocompletado para buscar alumnos ---
+let currentFocus;
+
+function autocomplete(inp) {
+  inp.addEventListener("input", async function(e) {
+    let a, b, i, val = this.value;
+    closeAllLists();
+    if (!val) { return false;}
+    currentFocus = -1;
+    a = document.getElementById("autocompleteList");
+    if (!a) {
+      a = document.createElement("DIV");
+      a.setAttribute("id", "autocompleteList");
+      a.setAttribute("class", "autocomplete-items");
+      this.parentNode.appendChild(a);
+    }
+
+    const filteredArr = await searchPlantillaAlumnos(val);
+
+    for (i = 0; i < filteredArr.length; i++) {
+      b = document.createElement("DIV");
+      let displayHtml = "<strong>" + filteredArr[i].nombre.substr(0, val.length) + "</strong>";
+      displayHtml += filteredArr[i].nombre.substr(val.length);
+      displayHtml += " <small class='text-muted'>(" + filteredArr[i].correo + ")</small>";
+
+      if (filteredArr[i].estado === 'Inactivo') {
+        displayHtml += " <span class='badge bg-danger ms-2'>Inactivo</span>";
+      }
+      
+      b.innerHTML = displayHtml;
+      b.innerHTML += "<input type='hidden' value='" + filteredArr[i].id + "'>";
+      b.addEventListener("click", async function(e) {
+          const plantillaId = parseInt(this.getElementsByTagName("input")[0].value);
+          const alumnoPlantilla = await getPlantillaAlumnoById(plantillaId);
+          if (alumnoPlantilla) {
+              if (alumnoPlantilla.estado === 'Inactivo') {
+                  if (confirm(`El alumno ${alumnoPlantilla.nombre} está INACTIVO. ¿Desea activarlo para reinscribirlo?`)) {
+                      alumnoPlantilla.estado = 'Activo';
+                      await updatePlantillaAlumno(alumnoPlantilla);
+                      showToast(`${alumnoPlantilla.nombre} ha sido activado.`, 'success');
+                      await renderPlantillaAlumnos();
+                  } else {
+                      closeAllLists();
+                      return;
+                  }
+              }
+
+              document.getElementById('nombre').value = alumnoPlantilla.nombre;
+              document.getElementById('nivel').value = alumnoPlantilla.nivel;
+              document.getElementById('telefono').value = alumnoPlantilla.telefono;
+              document.getElementById('correo').value = alumnoPlantilla.correo;
+              document.getElementById('estatus').value = 'Recurrente';
+              document.getElementById('idAlumnoPlantilla').value = alumnoPlantilla.id;
+              document.getElementById('buscarAlumno').value = alumnoPlantilla.nombre;
+              document.getElementById('idAlumnoEditando').value = '';
+              document.getElementById('btnRegistrarAlumno').innerHTML = '<i class="fas fa-save me-2"></i>Registrar Alumno';
+          }
+          closeAllLists();
+      });
+      a.appendChild(b);
+    }
+  });
+
+  inp.addEventListener("keydown", function(e) {
+    let x = document.getElementById("autocompleteList");
+    if (x) x = x.getElementsByTagName("div");
+    if (e.keyCode == 40) {
+      currentFocus++;
+      addActive(x);
+    } else if (e.keyCode == 38) {
+      currentFocus--;
+      addActive(x);
+    } else if (e.keyCode == 13) {
+      e.preventDefault();
+      if (currentFocus > -1) {
+        if (x) x[currentFocus].click();
+      }
+    }
+  });
+
+  function addActive(x) {
+    if (!x) return false;
+    removeActive(x);
+    if (currentFocus >= x.length) currentFocus = 0;
+    if (currentFocus < 0) currentFocus = (x.length - 1);
+    x[currentFocus].classList.add("autocomplete-active");
+  }
+
+  function removeActive(x) {
+    for (let i = 0; i < x.length; i++) {
+      x[i].classList.remove("autocomplete-active");
+    }
+  }
+
+  function closeAllLists(elmnt) {
+    const x = document.getElementsByClassName("autocomplete-items");
+    for (let i = 0; i < x.length; i++) {
+      if (elmnt != x[i] && elmnt != inp) {
+        x[i].parentNode.removeChild(x[i]);
+      }
+    }
+  }
+
+  document.addEventListener("click", function (e) {
+      closeAllLists(e.target);
+  });
+}
+
+// --- REPORTES ---
+async function populateReportFilters() {
+  const profesores = await getProfesores();
+  const proyectos = await getProyectos();
+
+  const reportProfesorFilter = document.getElementById('reportProfesorFilter');
+  reportProfesorFilter.innerHTML = '<option value="">Todos</option>';
+  profesores.forEach(p => {
+    reportProfesorFilter.innerHTML += `<option value="${p.id}">${p.nombre}</option>`;
+  });
+
+  const reportProyectoFilter = document.getElementById('reportProyectoFilter');
+  reportProyectoFilter.innerHTML = '<option value="">Todos</option>';
+  proyectos.forEach(p => {
+    reportProyectoFilter.innerHTML += `<option value="${p.id}">${p.nombre}</option>`;
+  });
+}
+
+async function renderReportes() {
+  await populateReportFilters();
+  await applyReportFilters(); // Cargar el reporte inicial al abrir la pestaña
+}
+
+async function applyReportFilters() {
+  const filterProfesorId = document.getElementById('reportProfesorFilter').value;
+  const filterProyectoId = document.getElementById('reportProyectoFilter').value;
+  const filterNivel = document.getElementById('reportNivelFilter').value;
+  const filterEstatus = document.getElementById('reportEstatusFilter').value;
+  const filterPago = document.getElementById('reportPagoFilter').value;
+  const filterKit = document.getElementById('reportKitFilter').value;
+
+  const allAlumnos = await getAlumnos();
+  const allCupos = await getCupos();
+  const allProfesores = await getProfesores();
+  const allProyectos = await getProyectos();
+
+  let filteredAlumnos = allAlumnos.filter(alumno => {
+    let matches = true;
+
+    // Filtrar por Profesor
+    if (filterProfesorId) {
+      const cupo = allCupos.find(c => c.id === alumno.cupoId);
+      if (!cupo || cupo.profesorId !== parseInt(filterProfesorId)) {
+        matches = false;
+      }
+    }
+
+    // Filtrar por Proyecto
+    if (filterProyectoId) {
+      if (alumno.proyectoId !== parseInt(filterProyectoId)) {
+        matches = false;
+      }
+    }
+
+    // Filtrar por Nivel
+    if (filterNivel && alumno.nivel !== filterNivel) {
+      matches = false;
+    }
+
+    // Filtrar por Estatus
+    if (filterEstatus && alumno.estatus !== filterEstatus) {
+      matches = false;
+    }
+
+    // Filtrar por Pago
+    if (filterPago) {
+      if (filterPago === 'N/A') {
+        if (alumno.pago !== '' && alumno.pago !== undefined && alumno.pago !== null) {
+          matches = false;
+        }
+      } else if (alumno.pago !== filterPago) {
+        matches = false;
+      }
+    }
+
+    // Filtrar por Kit
+    if (filterKit) {
+      if (filterKit === 'N/A') {
+        if (alumno.kit !== '' && alumno.kit !== undefined && alumno.kit !== null) {
+          matches = false;
+        }
+      } else if (alumno.kit !== filterKit) {
+        matches = false;
+      }
+    }
+
+    return matches;
+  });
+
+  const reportResultsBody = document.getElementById('reportResults');
+  reportResultsBody.innerHTML = '';
+
+  // Almacenar los alumnos filtrados globalmente para la exportación
+  lastFilteredAlumnos = []; 
+
+  if (filteredAlumnos.length === 0) {
+    reportResultsBody.innerHTML = '<tr><td colspan="8" class="text-center">No hay alumnos que coincidan con los filtros aplicados.</td></tr>';
+    document.getElementById('btnExportExcel').disabled = true;
+  } else {
+    for (const alumno of filteredAlumnos) {
+      const cupo = allCupos.find(c => c.id === alumno.cupoId);
+      let horarioTexto = 'N/A';
+      let profesorNombre = 'N/A';
+      if (cupo) {
+        const profesor = allProfesores.find(p => p.id === cupo.profesorId);
+        profesorNombre = profesor ? profesor.nombre : 'N/A';
+        const fechasTexto = Array.isArray(cupo.fechas) ? cupo.fechas.join(', ') : cupo.fechas;
+        horarioTexto = `${profesorNombre} - ${fechasTexto} ${cupo.horaInicio}-${cupo.horaFin}`;
+      }
+
+      const proyectoAsignado = allProyectos.find(p => p.id === alumno.proyectoId);
+      const nombreProyectoAsignado = proyectoAsignado ? proyectoAsignado.nombre : 'Sin Proyecto';
+
+      reportResultsBody.innerHTML += `<tr>
+        <td>${alumno.nombre}</td>
+        <td>${alumno.nivel}</td>
+        <td>${horarioTexto}</td>
+        <td>${nombreProyectoAsignado}</td>
+        <td>${alumno.pago || 'N/A'}</td>
+        <td>${alumno.kit || 'N/A'}</td>
+        <td>${alumno.observaciones || 'N/A'}</td>
+        <td>${alumno.estatus}</td>
+      </tr>`;
+
+      // Preparar datos para exportación
+      lastFilteredAlumnos.push({
+        Nombre: alumno.nombre,
+        Nivel: alumno.nivel,
+        Horario: horarioTexto,
+        Profesor: profesorNombre,
+        'Proyecto Asignado': nombreProyectoAsignado,
+        Pago: alumno.pago || 'N/A',
+        Kit: alumno.kit || 'N/A',
+        Observaciones: alumno.observaciones || 'N/A',
+        Estatus: alumno.estatus
+      });
+    }
+    document.getElementById('btnExportExcel').disabled = false;
+  }
+}
+
+// --- FUNCIONES DE EXPORTACIÓN ---
+async function exportToExcel() {
+  if (lastFilteredAlumnos.length === 0) {
+    showToast("No hay datos en el reporte para exportar a Excel.", 'warning');
+    return;
+  }
+
+  const wb = XLSX.utils.book_new();
+
+  // Hoja de datos detallados
+  const ws_data = XLSX.utils.json_to_sheet(lastFilteredAlumnos);
+  XLSX.utils.book_append_sheet(wb, ws_data, "Alumnos Filtrados");
+
+  XLSX.writeFile(wb, "Reporte_Alumnos.xlsx");
+  showToast("Reporte exportado a Excel exitosamente.", 'success');
+}
+
+async function exportToJson() {
+  const allData = {
+    alumnos: await getAlumnos(),
+    cupos: await getCupos(),
+    profesores: await getProfesores(),
+    plantillaAlumnos: await getPlantillaAlumnos(),
+    proyectos: await getProyectos()
+  };
+
+  const dataStr = JSON.stringify(allData, null, 2); // null, 2 para un formato legible
+  const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
+
+  const exportFileDefaultName = 'backup_sistema_alumnos.json';
+
+  let linkElement = document.createElement('a');
+  linkElement.setAttribute('href', dataUri);
+  linkElement.setAttribute('download', exportFileDefaultName);
+  linkElement.click();
+
+  showToast("Datos del sistema exportados a JSON exitosamente.", 'success');
+}
+
+async function importJson(event) {
+  const file = event.target.files[0];
+  if (!file) {
+    showToast("No se seleccionó ningún archivo.", 'warning');
+    return;
+  }
+
+  if (!confirm("¡ADVERTENCIA! Importar un archivo JSON SOBRESCRIBIRÁ TODOS los datos existentes en el sistema (alumnos, cupos, profesores, etc.). ¿Está seguro de que desea continuar?")) {
+    event.target.value = '';
+    return;
+  }
+
+  const reader = new FileReader();
+  reader.onload = async (e) => {
+    try {
+      const importedData = JSON.parse(e.target.result);
+
+      const expectedStores = [STORE_ALUMNOS, STORE_CUPOS, STORE_PROFESORES, STORE_PLANTILLA_ALUMNOS, STORE_PROYECTOS];
+      for (const storeName of expectedStores) {
+        if (!Array.isArray(importedData[storeName])) {
+          showToast(`El archivo JSON no tiene el formato esperado. Falta o es incorrecta la sección: ${storeName}`, 'danger');
+          event.target.value = '';
+          return;
+        }
+      }
+
+      const transaction = db.transaction(expectedStores, 'readwrite');
+
+      transaction.oncomplete = async () => {
+        showToast("Datos importados exitosamente. Recargando el sistema...", 'success');
+        await renderProfesores();
+        await renderCupos();
+        await renderAlumnos();
+        await renderPlantillaAlumnos();
+        await renderProyectos();
+        await renderReportes();
+        event.target.value = '';
+      };
+
+      transaction.onerror = (err) => {
+        showToast(`Error al guardar los datos importados: ${err.target.error}`, 'danger');
+        event.target.value = '';
+      };
+
+      transaction.onabort = (err) => {
+        showToast(`Importación abortada: ${err.target.error}`, 'danger');
+        event.target.value = '';
+      };
+
+      // Borrar datos existentes en cada store
+      for (const storeName of expectedStores) {
+        const objectStore = transaction.objectStore(storeName);
+        objectStore.clear();
+      }
+
+      // Mapeos para IDs originales a nuevos IDs de IndexedDB
+      const profesorIdMap = new Map(); // Map<originalProfesorId, newProfesorId>
+      const cupoIdMap = new Map();     // Map<originalCupoId, newCupoId>
+      const proyectoIdMap = new Map(); // Map<originalProyectoId, newProyectoId>
+      const plantillaIdMap = new Map(); // Map<originalPlantillaId, newPlantillaId>
+
+      // 1. Añadir Profesores primero y crear el mapeo de IDs
+      const profesoresStore = transaction.objectStore(STORE_PROFESORES);
+      const profesorPromises = importedData[STORE_PROFESORES].map(item => {
+        return new Promise((resolve, reject) => {
+          const originalId = item.id;
+          delete item.id;
+          const request = profesoresStore.add(item);
+          request.onsuccess = (event) => {
+            profesorIdMap.set(originalId, event.target.result);
+            resolve();
+          };
+          request.onerror = reject;
+        });
+      });
+      await Promise.all(profesorPromises); // Esperar a que todos los profesores se añadan y mapeen
+
+      // 2. Añadir Proyectos y crear el mapeo de IDs
+      const proyectosStore = transaction.objectStore(STORE_PROYECTOS);
+      const proyectoPromises = importedData[STORE_PROYECTOS].map(item => {
+        return new Promise((resolve, reject) => {
+          const originalId = item.id;
+          delete item.id;
+          const request = proyectosStore.add(item);
+          request.onsuccess = (event) => {
+            proyectoIdMap.set(originalId, event.target.result);
+            resolve();
+          };
+          request.onerror = reject;
+        });
+      });
+      await Promise.all(proyectoPromises); // Esperar a que todos los proyectos se añadan y mapeen
+
+      // 3. Añadir Plantilla Alumnos y crear el mapeo de IDs
+      const plantillaAlumnosStore = transaction.objectStore(STORE_PLANTILLA_ALUMNOS);
+      const plantillaPromises = importedData[STORE_PLANTILLA_ALUMNOS].map(item => {
+        return new Promise((resolve, reject) => {
+          const originalId = item.id;
+          delete item.id;
+          const request = plantillaAlumnosStore.add(item);
+          request.onsuccess = (event) => {
+            plantillaIdMap.set(originalId, event.target.result);
+            resolve();
+          };
+          request.onerror = reject;
+        });
+      });
+      await Promise.all(plantillaPromises); // Esperar a que todos los plantillaAlumnos se añadan y mapeen
+
+      // 4. Añadir Cupos, actualizando profesorId y creando mapeo de IDs
+      const cuposStore = transaction.objectStore(STORE_CUPOS);
+      const cupoPromises = importedData[STORE_CUPOS].map(item => {
+        return new Promise((resolve, reject) => {
+          const originalId = item.id;
+          // Actualizar profesorId
+          if (item.profesorId !== undefined && profesorIdMap.has(item.profesorId)) {
+            item.profesorId = profesorIdMap.get(item.profesorId);
+          } else if (item.profesorId !== undefined && item.profesorId !== null) {
+            console.warn(`Profesor con ID original ${item.profesorId} no encontrado en el mapeo para cupo ${originalId}. Asignando null.`);
+            item.profesorId = null;
+          }
+          delete item.id;
+          const request = cuposStore.add(item);
+          request.onsuccess = (event) => {
+            cupoIdMap.set(originalId, event.target.result);
+            resolve();
+          };
+          request.onerror = reject;
+        });
+      });
+      await Promise.all(cupoPromises); // Esperar a que todos los cupos se añadan y mapeen
+
+      // 5. Añadir Alumnos, actualizando cupoId, proyectoId y plantillaId
+      const alumnosStore = transaction.objectStore(STORE_ALUMNOS);
+      const alumnoPromises = importedData[STORE_ALUMNOS].map(item => {
+        return new Promise((resolve, reject) => {
+          // Actualizar cupoId
+          if (item.cupoId !== undefined && cupoIdMap.has(item.cupoId)) {
+            item.cupoId = cupoIdMap.get(item.cupoId);
+          } else if (item.cupoId !== undefined && item.cupoId !== null) {
+            console.warn(`Cupo con ID original ${item.cupoId} no encontrado en el mapeo para alumno ${item.nombre}. Asignando null.`);
+            item.cupoId = null;
+          }
+          // Actualizar proyectoId
+          if (item.proyectoId !== undefined && proyectoIdMap.has(item.proyectoId)) {
+            item.proyectoId = proyectoIdMap.get(item.proyectoId);
+          } else if (item.proyectoId !== undefined && item.proyectoId !== null) {
+            console.warn(`Proyecto con ID original ${item.proyectoId} no encontrado en el mapeo para alumno ${item.nombre}. Asignando null.`);
+            item.proyectoId = null;
+          }
+          // Actualizar plantillaId
+          if (item.plantillaId !== undefined && plantillaIdMap.has(item.plantillaId)) {
+            item.plantillaId = plantillaIdMap.get(item.plantillaId);
+          } else if (item.plantillaId !== undefined && item.plantillaId !== null) {
+            console.warn(`Plantilla con ID original ${item.plantillaId} no encontrado en el mapeo para alumno ${item.nombre}. Asignando null.`);
+            item.plantillaId = null;
+          }
+
+          delete item.id;
+          const request = alumnosStore.add(item);
+          request.onsuccess = resolve;
+          request.onerror = reject;
+        });
+      });
+      await Promise.all(alumnoPromises); // Esperar a que todos los alumnos se añadan
+
+      // La transacción se completará automáticamente una vez que todas las operaciones asíncronas
+      // (los Promise.all) dentro de ella hayan terminado y no haya errores.
+
+    } catch (error) {
+      showToast(`Error al leer o parsear el archivo JSON: ${error.message}`, 'danger');
+      event.target.value = '';
+    }
+  };
+  reader.readAsText(file);
+}
+
+
+// --- EVENTOS ---
+document.addEventListener('DOMContentLoaded',async()=>{
+  await openDB();
+  await renderProfesores();
+  await renderCupos();
+  await renderAlumnos();
+  await renderPlantillaAlumnos();
+  await renderProyectos();
+  renderFechasSeleccionadas();
+
+  autocomplete(document.getElementById("buscarAlumno"));
+
+  document.getElementById('alumnoForm').addEventListener('submit',async e=>{
+    e.preventDefault();
+
+    const idAlumnoEditando = document.getElementById('idAlumnoEditando').value;
+    let idAlumnoPlantilla = document.getElementById('idAlumnoPlantilla').value;
+
+    let alumnoData = {
+      nombre: nombre.value,
+      nivel: nivel.value,
+      telefono: telefono.value,
+      correo: correo.value,
+      estatus: estatus.value,
+      observaciones: '', 
+      pago: '', // Inicializar pago
+      kit: '',   // Inicializar kit
+      cupoId: null,
+      proyectoId: null,
+      plantillaId: idAlumnoPlantilla ? parseInt(idAlumnoPlantilla) : undefined
+    };
+
+    let plantillaData = {
+      nombre: nombre.value,
+      telefono: telefono.value,
+      correo: correo.value,
+      nivel: nivel.value,
+      observaciones: '', 
+      estado: 'Activo'
+    };
+
+    if (idAlumnoEditando) {
+      alumnoData.id = parseInt(idAlumnoEditando);
+
+      const alumnoOriginal = await getAlumnoById(alumnoData.id);
+      if (!alumnoOriginal) {
+        showToast("Error: Alumno original no encontrado para edición.", 'danger');
+        return;
+      }
+      
+      alumnoData.cupoId = alumnoOriginal.cupoId; 
+      alumnoData.proyectoId = alumnoOriginal.proyectoId;
+      alumnoData.observaciones = alumnoOriginal.observaciones; 
+      alumnoData.pago = alumnoOriginal.pago; // Mantener pago existente
+      alumnoData.kit = alumnoOriginal.kit;   // Mantener kit existente
+
+      await updateAlumno(alumnoData);
+      showToast("Datos del alumno actualizados exitosamente.", 'success');
+
+      if (idAlumnoPlantilla) {
+        plantillaData.id = parseInt(idAlumnoPlantilla);
+        plantillaData.observaciones = alumnoOriginal.observaciones; 
+        await updatePlantillaAlumno(plantillaData);
+      } else {
+        const existingPlantilla = (await getPlantillaAlumnos()).find(p => p.correo === plantillaData.correo);
+        if (existingPlantilla) {
+          plantillaData.id = existingPlantilla.id;
+          plantillaData.observaciones = alumnoOriginal.observaciones; 
+          await updatePlantillaAlumno(plantillaData);
+          alumnoData.plantillaId = existingPlantilla.id;
+          await updateAlumno(alumnoData);
+        } else {
+          const newPlantillaId = await addPlantillaAlumno(plantillaData);
+          alumnoData.plantillaId = newPlantillaId;
+          await updateAlumno(alumnoData);
+        }
+      }
+
+    } else {
+      if (!idAlumnoPlantilla) {
+        const existingPlantilla = (await getPlantillaAlumnos()).find(p => p.correo === plantillaData.correo);
+        if (existingPlantilla) {
+          plantillaData.id = existingPlantilla.id;
+          await updatePlantillaAlumno(plantillaData);
+          alumnoData.plantillaId = existingPlantilla.id;
+        } else {
+          const newPlantillaId = await addPlantillaAlumno(plantillaData);
+          alumnoData.plantillaId = newPlantillaId;
+        }
+      }
+
+      await addAlumno(alumnoData);
+      showToast("Alumno registrado exitosamente. Asigne un horario y proyecto desde la pestaña 'Alumnos Inscritos'.", 'success');
+    }
+
+    resetAlumnoForm();
+    await renderAlumnos();
+    await renderCupos();
+    await renderPlantillaAlumnos();
+    autocomplete(document.getElementById("buscarAlumno"));
+  });
+
+  document.getElementById('btnLimpiarAlumnoForm').addEventListener('click', () => {
+    resetAlumnoForm();
+  });
+
+  document.getElementById('btnAddFechaCupo').addEventListener('click', addFechaToCupo);
+
+  document.getElementById('cupoForm').addEventListener('submit',async e=>{
+    e.preventDefault();
+    const profesorId = parseInt(document.getElementById('profesorSelect').value);
+    if (!profesorId) {
+      showToast("Seleccione un profesor válido.", 'warning');
+      return;
+    }
+    if (fechasTemporalesCupo.length === 0) {
+      showToast("Debe añadir al menos una fecha para el cupo.", 'warning');
+      return;
+    }
+
+    const c={
+      profesorId: profesorId,
+      fechas: fechasTemporalesCupo,
+      horaInicio:horaInicio.value,
+      horaFin:horaFin.value,
+      cupoMax:parseInt(cupoMax.value)
+    };
+    await addCupo(c);
+    e.target.reset();
+    fechasTemporalesCupo = [];
+    renderFechasSeleccionadas();
+    await renderCupos();
+    await renderAlumnos();
+    showToast("Cupo registrado exitosamente.", 'success');
+  });
+
+  document.getElementById('profesorForm').addEventListener('submit', async e => {
+    e.preventDefault();
+    const idProfesorEditando = document.getElementById('idProfesorEditando').value;
+    let profesorData = {
+      nombre: nombreProfesor.value,
+      correo: correoProfesor.value,
+      telefono: telefonoProfesor.value
+    };
+
+    if (idProfesorEditando) {
+      profesorData.id = parseInt(idProfesorEditando);
+      await updateProfesor(profesorData);
+      showToast("Profesor actualizado exitosamente.", 'success');
+    } else {
+      await addProfesor(profesorData);
+      showToast("Profesor registrado exitosamente.", 'success');
+    }
+
+    resetProfesorForm();
+    await renderProfesores();
+    await renderCupos();
+    await renderAlumnos();
+  });
+
+  document.getElementById('proyectoForm').addEventListener('submit', async e => {
+    e.preventDefault();
+    const idProyectoEditando = document.getElementById('idProyectoEditando').value;
+    let proyectoData = {
+      nombre: nombreProyecto.value,
+    };
+
+    if (idProyectoEditando) {
+      proyectoData.id = parseInt(idProyectoEditando);
+      await updateProyecto(proyectoData);
+      showToast("Proyecto actualizado exitosamente.", 'success');
+    } else {
+      await addProyecto(proyectoData);
+      showToast("Proyecto registrado exitosamente.", 'success');
+    }
+
+    resetProyectoForm();
+    await renderProyectos();
+  });
+
+  document.getElementById('btnGuardarCambioHorario').addEventListener('click', guardarCambioHorario);
+
+  document.getElementById('btnGuardarProyecto').addEventListener('click', guardarProyectoAlumno);
+
+  // Evento para la pestaña de reportes
+  document.getElementById('reportes-tab').addEventListener('shown.bs.tab', renderReportes);
+  document.getElementById('btnApplyReportFilters').addEventListener('click', applyReportFilters);
+  document.getElementById('btnExportExcel').addEventListener('click', exportToExcel);
+  document.getElementById('btnExportJson').addEventListener('click', exportToJson);
+  
+  // Eventos para importar JSON
+  document.getElementById('btnImportJson').addEventListener('click', () => {
+    document.getElementById('jsonFileInput').click(); // Activar el input de archivo oculto
+  });
+  document.getElementById('jsonFileInput').addEventListener('change', importJson);
+});
+</script>
+</body>
+</html>
